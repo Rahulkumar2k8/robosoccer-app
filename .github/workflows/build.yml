@@ -18,7 +18,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y unzip
-          unzip -q RoboSoccer_RC_Lab_Android_Studio_Project.zip -d .
+          cp RoboSoccer_Android_App/app/src/main/assets/index.html /tmp/robosoccer-index.html
+          unzip -oq RoboSoccer_RC_Lab_Android_Studio_Project.zip -d .
+          cp /tmp/robosoccer-index.html RoboSoccer_Android_App/app/src/main/assets/index.html
           echo "Extracted project files:"
           find . -maxdepth 3 \( -name settings.gradle -o -name settings.gradle.kts \) -print
           test -f RoboSoccer_Android_App/settings.gradle -o -f RoboSoccer_Android_App/settings.gradle.kts
