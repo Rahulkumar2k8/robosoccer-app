@@ -21,6 +21,9 @@ jobs:
           cp RoboSoccer_Android_App/app/src/main/assets/index.html /tmp/robosoccer-index.html
           unzip -oq RoboSoccer_RC_Lab_Android_Studio_Project.zip -d .
           cp /tmp/robosoccer-index.html RoboSoccer_Android_App/app/src/main/assets/index.html
+          cp -a android-overrides/. RoboSoccer_Android_App/
+          echo "Applied Android USB and package-manager overrides"
+          test -f RoboSoccer_Android_App/app/src/main/java/com/robosoccer/rclab/MainActivity.java
           echo "Extracted project files:"
           find . -maxdepth 3 \( -name settings.gradle -o -name settings.gradle.kts \) -print
           test -f RoboSoccer_Android_App/settings.gradle -o -f RoboSoccer_Android_App/settings.gradle.kts
