@@ -5,12 +5,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Extract Project ZIP
-        run: unzip RoboSoccer_RC_Lab_Android_Studio_Project.zip
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -23,4 +23,3 @@ jobs:
         with:
           name: RoboSoccer-Debug-APK
           path: RoboSoccer_Android_App/app/build/outputs/apk/debug/app-debug.apk
-          
