@@ -994,3 +994,2700 @@
 
   <!-- =======================================================================
        CUSTOM MODALS (NO alert() / confirm() USED ANYWHERE)
+       ======================================================================= -->
+  <!-- 1. Customize Mode Modal -->
+  <div id="customizeModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-nordic-panel border border-nordic-border rounded-2xl max-w-md w-full p-5 shadow-2xl">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-base font-bold text-white flex items-center gap-2">
+          <span class="text-purple-400">✏️</span> Enter Custom Arduino IDE Mode
+        </h2>
+        <button id="closeCustomizeModal" class="text-slate-400 hover:text-white cursor-pointer text-lg leading-none">&times;</button>
+      </div>
+      <p class="text-xs text-slate-300 leading-relaxed mb-4">
+        Built-in RC presets are locked as <strong class="text-amber-300">Read-Only</strong> so your reference firmware stays safe. Choose how you want to start coding your own custom ESP32 sketch:
+      </p>
+      <div class="flex flex-col gap-2.5">
+        <button id="btnCloneCurrent" class="w-full text-left p-3 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-400/40 transition cursor-pointer">
+          <div class="text-xs font-bold text-indigo-200">Clone Current Preset to Editable Custom Sketch</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Forks the currently loaded preset code so you can tweak deadzones, pins, or mixing logic.</div>
+        </button>
+        <button id="btnNewBlank" class="w-full text-left p-3 rounded-xl bg-nordic-elevated hover:bg-nordic-hover border border-nordic-border transition cursor-pointer">
+          <div class="text-xs font-bold text-sky-300">New Blank ESP32 + BTS7960 Arduino Template</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Starts fresh with a clean pinout skeleton ready for your own C++ code.</div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Save Sketch Modal -->
+  <div id="saveModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <form id="saveForm" class="bg-nordic-panel border border-nordic-border rounded-2xl max-w-md w-full p-5 shadow-2xl">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-base font-bold text-white">Save Sketch to Local Library</h2>
+        <button type="button" id="closeSaveModal" class="text-slate-400 hover:text-white cursor-pointer text-lg leading-none">&times;</button>
+      </div>
+      <p class="text-xs text-slate-400 mb-3">
+        Saved sketches are stored in your browser's <code class="text-sky-300">localStorage</code> and appear under <strong>Saved Sketches</strong> in the Preset Selector dropdown.
+      </p>
+      <label class="block text-xs font-semibold text-slate-300 mb-1" for="saveSketchNameInput">Sketch Name</label>
+      <input id="saveSketchNameInput" type="text" required maxlength="42" placeholder="e.g. My Turbo Striker v2" class="w-full bg-nordic-bg border border-nordic-border focus:border-sky-400 rounded-lg px-3 py-2 text-xs font-mono text-white focus:outline-none mb-3" />
+
+      <label class="block text-xs font-semibold text-slate-300 mb-1" for="saveVehicleModeSelect">2D Simulation Arena Theme</label>
+      <select id="saveVehicleModeSelect" class="w-full bg-nordic-bg border border-nordic-border focus:border-sky-400 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none mb-4">
+        <option value="soccer">RoboSoccer 4WD Pitch</option>
+        <option value="car">RC Car Racetrack</option>
+        <option value="tank">RC Tank Tactical Arena</option>
+        <option value="airplane">RC Airplane Flight HUD</option>
+        <option value="ship">RC Ship / Boat Water Basin</option>
+      </select>
+
+      <div class="flex items-center justify-end gap-2">
+        <button type="button" id="cancelSaveBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-nordic-elevated hover:bg-nordic-hover text-slate-300 cursor-pointer">Cancel</button>
+        <button type="submit" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white cursor-pointer">Save Sketch</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- 3. Delete Confirmation Modal -->
+  <div id="deleteModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-nordic-panel border border-red-500/40 rounded-2xl max-w-sm w-full p-5 shadow-2xl">
+      <h2 class="text-base font-bold text-red-300 mb-2">Delete Saved Sketch?</h2>
+      <p id="deleteModalMsg" class="text-xs text-slate-300 mb-4">Are you sure you want to delete this saved sketch?</p>
+      <div class="flex items-center justify-end gap-2">
+        <button id="cancelDeleteBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-nordic-elevated hover:bg-nordic-hover text-slate-300 cursor-pointer">Cancel</button>
+        <button id="confirmDeleteBtn" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-red-600 hover:bg-red-500 text-white cursor-pointer">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tooltip & Toast Layer -->
+  <div id="hwTooltip"></div>
+  <div id="toastContainer"></div>
+
+  <!-- =======================================================================
+       CORE APPLICATION JAVASCRIPT ENGINE
+       ======================================================================= -->
+  <script>
+    (() => {
+      'use strict';
+
+      /* =====================================================================
+         1. BUILT-IN PRESETS (NON-CONFLICTING ESP32 + DUAL BTS7960 + FS-i6S)
+         ===================================================================== */
+      const BUILTIN_PRESETS = {
+        robosoccer_arcade: {
+          name: 'RoboSoccer 4WD (Arcade Drive)',
+          vehicle: 'soccer',
+          throttleHold: false,
+          readOnly: true,
+          code: `// ============================================================
+// PRESET 1: RoboSoccer 4WD (Arcade Drive)
+// MCU: ESP32 Dev Module | TX/RX: FlySky FS-i6S + FS-iA6B
+// Drivers: Dual BTS7960 (IBT-2 43A High-Current H-Bridge)
+// ============================================================
+
+#define CH1_STEER    34   // FS-i6S Right Stick X
+#define CH2_THROTTLE 35   // FS-i6S Right Stick Y
+#define LED_STATUS   2    // Onboard Blue LED
+
+// Left Bank BTS7960 (Front-Left + Rear-Left Motors)
+#define L_RPWM 25
+#define L_LPWM 26
+#define L_EN   14
+
+// Right Bank BTS7960 (Front-Right + Rear-Right Motors)
+#define R_RPWM 27
+#define R_LPWM 13
+#define R_EN   12
+
+const int DEADZONE = 45;
+const int MAX_PWM  = 255;
+
+unsigned long lastLog = 0;
+bool remoteStop = false;
+
+void driveBTS7960(int rpwmPin, int lpwmPin, int enPin, int speed) {
+  speed = constrain(speed, -MAX_PWM, MAX_PWM);
+  if (speed > 0) {
+    digitalWrite(enPin, HIGH);
+    analogWrite(rpwmPin, speed);
+    analogWrite(lpwmPin, 0);
+  } else if (speed < 0) {
+    digitalWrite(enPin, HIGH);
+    analogWrite(rpwmPin, 0);
+    analogWrite(lpwmPin, abs(speed));
+  } else {
+    digitalWrite(enPin, LOW);
+    analogWrite(rpwmPin, 0);
+    analogWrite(lpwmPin, 0);
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(CH1_STEER, INPUT);
+  pinMode(CH2_THROTTLE, INPUT);
+  pinMode(LED_STATUS, OUTPUT);
+
+  pinMode(L_RPWM, OUTPUT); pinMode(L_LPWM, OUTPUT); pinMode(L_EN, OUTPUT);
+  pinMode(R_RPWM, OUTPUT); pinMode(R_LPWM, OUTPUT); pinMode(R_EN, OUTPUT);
+
+  Serial.println("[ESP32] RoboSoccer 4WD Arcade (Dual BTS7960) Ready!");
+  Serial.println("[HINT] Drag Right Stick or use WASD. Type INFO, STOP, GO.");
+}
+
+void loop() {
+  if (Serial.available()) {
+    String cmd = Serial.readStringUntil('\\n');
+    cmd.trim(); cmd.toUpperCase();
+    if (cmd == "STOP") { remoteStop = true; Serial.println("[CMD] Remote STOP ON"); }
+    else if (cmd == "GO") { remoteStop = false; Serial.println("[CMD] Remote STOP OFF"); }
+    else if (cmd == "INFO") { Serial.println("[INFO] BTS7960-L:25/26/14 | BTS7960-R:27/13/12"); }
+  }
+
+  long ch1 = pulseIn(CH1_STEER, HIGH, 25000);
+  long ch2 = pulseIn(CH2_THROTTLE, HIGH, 25000);
+
+  if (ch1 < 850 || ch2 < 850 || remoteStop) {
+    driveBTS7960(L_RPWM, L_LPWM, L_EN, 0);
+    driveBTS7960(R_RPWM, R_LPWM, R_EN, 0);
+    digitalWrite(LED_STATUS, LOW);
+    if (millis() - lastLog > 600) {
+      lastLog = millis();
+      Serial.println(remoteStop ? "[HALT] Serial STOP active" : "[FAILSAFE] FS-i6S Signal Lost!");
+    }
+    return;
+  }
+
+  int steer    = (abs(ch1 - 1500) > DEADZONE) ? map(ch1, 1000, 2000, -MAX_PWM, MAX_PWM) : 0;
+  int throttle = (abs(ch2 - 1500) > DEADZONE) ? map(ch2, 1000, 2000, -MAX_PWM, MAX_PWM) : 0;
+
+  int leftOut  = constrain(throttle + steer, -MAX_PWM, MAX_PWM);
+  int rightOut = constrain(throttle - steer, -MAX_PWM, MAX_PWM);
+
+  driveBTS7960(L_RPWM, L_LPWM, L_EN, leftOut);
+  driveBTS7960(R_RPWM, R_LPWM, R_EN, rightOut);
+  digitalWrite(LED_STATUS, (leftOut != 0 || rightOut != 0) ? HIGH : LOW);
+
+  if (millis() - lastLog > 350) {
+    lastLog = millis();
+    Serial.print("CH1:"); Serial.print(ch1);
+    Serial.print(" CH2:"); Serial.print(ch2);
+    Serial.print(" | L:"); Serial.print(leftOut);
+    Serial.print(" R:"); Serial.println(rightOut);
+  }
+}`
+        },
+
+        robosoccer_pro: {
+          name: 'RoboSoccer Pro (Boost + Failsafe)',
+          vehicle: 'soccer',
+          throttleHold: false,
+          readOnly: true,
+          code: `// ============================================================
+// PRESET 2: RoboSoccer Pro (SWA Boost + SWB Arm + Failsafe)
+// MCU: ESP32 Dev Module | FlySky FS-i6S | Dual BTS7960 43A
+// ============================================================
+
+#define CH1_STEER    34
+#define CH2_THROTTLE 35
+#define CH5_BOOST    18   // SWA Switch (>1600us = TURBO)
+#define CH6_ARM      19   // SWB Switch (>1600us = ARMED)
+#define LED_STATUS   2
+
+#define L_RPWM 25
+#define L_LPWM 26
+#define L_EN   14
+
+#define R_RPWM 27
+#define R_LPWM 13
+#define R_EN   12
+
+const int DEADZONE   = 40;
+const int NORMAL_CAP = 175;  // Precision ball dribble
+const int TURBO_CAP  = 255;  // Full 43A BTS7960 kick burst
+
+unsigned long lastLog = 0;
+unsigned long lastBlink = 0;
+bool blinkState = false;
+bool serialBoost = false;
+
+void setBTS(int rpwm, int lpwm, int en, int spd) {
+  spd = constrain(spd, -255, 255);
+  if (spd > 0) {
+    digitalWrite(en, HIGH); analogWrite(rpwm, spd); analogWrite(lpwm, 0);
+  } else if (spd < 0) {
+    digitalWrite(en, HIGH); analogWrite(rpwm, 0); analogWrite(lpwm, abs(spd));
+  } else {
+    digitalWrite(en, LOW); analogWrite(rpwm, 0); analogWrite(lpwm, 0);
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(CH1_STEER, INPUT); pinMode(CH2_THROTTLE, INPUT);
+  pinMode(CH5_BOOST, INPUT); pinMode(CH6_ARM, INPUT);
+  pinMode(LED_STATUS, OUTPUT);
+
+  pinMode(L_RPWM, OUTPUT); pinMode(L_LPWM, OUTPUT); pinMode(L_EN, OUTPUT);
+  pinMode(R_RPWM, OUTPUT); pinMode(R_LPWM, OUTPUT); pinMode(R_EN, OUTPUT);
+
+  Serial.println("[PRO] RoboSoccer Competition Firmware Ready.");
+  Serial.println("[PRO] SWB(CH6)=ARM | SWA(CH5)=TURBO | Cmds: BOOST, INFO");
+}
+
+void loop() {
+  if (Serial.available()) {
+    String cmd = Serial.readStringUntil('\\n');
+    cmd.trim(); cmd.toUpperCase();
+    if (cmd == "BOOST") {
+      serialBoost = !serialBoost;
+      Serial.println(serialBoost ? "[CMD] Serial TURBO Override ON" : "[CMD] Serial TURBO OFF");
+    } else if (cmd == "INFO") {
+      Serial.println("[PRO] Normal=175/255 | Turbo=255/255 | Failsafe=<850us");
+    }
+  }
+
+  long ch1 = pulseIn(CH1_STEER, HIGH, 25000);
+  long ch2 = pulseIn(CH2_THROTTLE, HIGH, 25000);
+  long ch5 = pulseIn(CH5_BOOST, HIGH, 25000);
+  long ch6 = pulseIn(CH6_ARM, HIGH, 25000);
+
+  if (ch1 < 850 || ch2 < 850 || ch6 < 850) {
+    setBTS(L_RPWM, L_LPWM, L_EN, 0);
+    setBTS(R_RPWM, R_LPWM, R_EN, 0);
+    digitalWrite(LED_STATUS, LOW);
+    if (millis() - lastLog > 550) {
+      lastLog = millis();
+      Serial.println("[FAILSAFE!] FS-i6S Signal Lost -> BTS7960 Disabled");
+    }
+    return;
+  }
+
+  if (ch6 < 1600) {
+    setBTS(L_RPWM, L_LPWM, L_EN, 0);
+    setBTS(R_RPWM, R_LPWM, R_EN, 0);
+    if (millis() - lastBlink > 280) {
+      lastBlink = millis(); blinkState = !blinkState;
+      digitalWrite(LED_STATUS, blinkState ? HIGH : LOW);
+    }
+    if (millis() - lastLog > 700) {
+      lastLog = millis();
+      Serial.println("[DISARMED] Flip SWB (CH6) to ARM to drive.");
+    }
+    return;
+  }
+
+  bool turbo = (ch5 > 1600) || serialBoost;
+  int cap = turbo ? TURBO_CAP : NORMAL_CAP;
+
+  int steer = (abs(ch1 - 1500) > DEADZONE) ? map(ch1, 1000, 2000, -cap, cap) : 0;
+  int drive = (abs(ch2 - 1500) > DEADZONE) ? map(ch2, 1000, 2000, -cap, cap) : 0;
+
+  int leftPwm  = constrain(drive + steer, -cap, cap);
+  int rightPwm = constrain(drive - steer, -cap, cap);
+
+  setBTS(L_RPWM, L_LPWM, L_EN, leftPwm);
+  setBTS(R_RPWM, R_LPWM, R_EN, rightPwm);
+  digitalWrite(LED_STATUS, HIGH);
+
+  if (millis() - lastLog > 350) {
+    lastLog = millis();
+    Serial.print(turbo ? "[TURBO] " : "[ARMED] ");
+    Serial.print("L:"); Serial.print(leftPwm);
+    Serial.print(" R:"); Serial.println(rightPwm);
+  }
+}`
+        },
+
+        rc_car: {
+          name: 'RC Car (Throttle + Steering)',
+          vehicle: 'car',
+          throttleHold: false,
+          readOnly: true,
+          code: `// ============================================================
+// PRESET 3: RC Car (Ackermann Steering + 4WD Torque Vectoring)
+// CH1 = Steering Servo (IO21) + Electronic Differential
+// CH2 = Forward/Reverse Throttle | CH5 = Sport Mode
+// ============================================================
+
+#define CH1_STEER    34
+#define CH2_THROTTLE 35
+#define CH5_SPORT    18
+#define LED_STATUS   2
+#define STEER_SERVO  21   // Front Ackermann Steering PWM
+
+#define L_RPWM 25
+#define L_LPWM 26
+#define L_EN   14
+
+#define R_RPWM 27
+#define R_LPWM 13
+#define R_EN   12
+
+const int DEADZONE = 40;
+unsigned long lastLog = 0;
+
+void setWheelBank(int rpwm, int lpwm, int en, int spd) {
+  spd = constrain(spd, -255, 255);
+  if (spd > 0) {
+    digitalWrite(en, HIGH); analogWrite(rpwm, spd); analogWrite(lpwm, 0);
+  } else if (spd < 0) {
+    digitalWrite(en, HIGH); analogWrite(rpwm, 0); analogWrite(lpwm, abs(spd));
+  } else {
+    digitalWrite(en, LOW); analogWrite(rpwm, 0); analogWrite(lpwm, 0);
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(CH1_STEER, INPUT); pinMode(CH2_THROTTLE, INPUT); pinMode(CH5_SPORT, INPUT);
+  pinMode(LED_STATUS, OUTPUT); pinMode(STEER_SERVO, OUTPUT);
+  pinMode(L_RPWM, OUTPUT); pinMode(L_LPWM, OUTPUT); pinMode(L_EN, OUTPUT);
+  pinMode(R_RPWM, OUTPUT); pinMode(R_LPWM, OUTPUT); pinMode(R_EN, OUTPUT);
+
+  Serial.println("[RC CAR] ESP32 + Dual BTS7960 Torque-Vectoring Car Ready!");
+  Serial.println("[HINT] W/S or CH2 = Throttle | A/D or CH1 = Steering.");
+}
+
+void loop() {
+  long ch1 = pulseIn(CH1_STEER, HIGH, 25000);
+  long ch2 = pulseIn(CH2_THROTTLE, HIGH, 25000);
+  long ch5 = pulseIn(CH5_SPORT, HIGH, 25000);
+
+  if (ch1 < 850 || ch2 < 850) {
+    setWheelBank(L_RPWM, L_LPWM, L_EN, 0);
+    setWheelBank(R_RPWM, R_LPWM, R_EN, 0);
+    analogWrite(STEER_SERVO, 128);
+    digitalWrite(LED_STATUS, LOW);
+    if (millis() - lastLog > 600) { lastLog = millis(); Serial.println("[FAILSAFE] Car Stopped."); }
+    return;
+  }
+
+  int maxSpeed = (ch5 > 1600) ? 255 : 190;
+  int steerPwm = map(constrain(ch1, 1000, 2000), 1000, 2000, 0, 255);
+  analogWrite(STEER_SERVO, steerPwm);
+
+  int throttle = (abs(ch2 - 1500) > DEADZONE) ? map(ch2, 1000, 2000, -maxSpeed, maxSpeed) : 0;
+  int steerDelta = (abs(ch1 - 1500) > DEADZONE) ? map(ch1, 1000, 2000, -65, 65) : 0;
+
+  // Electronic differential: outer wheels spin slightly faster in turns
+  int leftSpd  = (throttle != 0) ? constrain(throttle + steerDelta, -maxSpeed, maxSpeed) : 0;
+  int rightSpd = (throttle != 0) ? constrain(throttle - steerDelta, -maxSpeed, maxSpeed) : 0;
+
+  setWheelBank(L_RPWM, L_LPWM, L_EN, leftSpd);
+  setWheelBank(R_RPWM, R_LPWM, R_EN, rightSpd);
+  digitalWrite(LED_STATUS, throttle != 0 ? HIGH : LOW);
+
+  if (millis() - lastLog > 380) {
+    lastLog = millis();
+    Serial.print("[CAR] Thr:"); Serial.print(throttle);
+    Serial.print(" Steer:"); Serial.print(steerPwm);
+    Serial.print(" | L:"); Serial.print(leftSpd);
+    Serial.print(" R:"); Serial.println(rightSpd);
+  }
+}`
+        },
+
+        rc_tank: {
+          name: 'RC Tank (Dual-Stick Skid Steer)',
+          vehicle: 'tank',
+          throttleHold: false,
+          readOnly: true,
+          code: `// ============================================================
+// PRESET 4: RC Tank (Dual-Stick Independent Track Control)
+// CH3 (Left Stick Y)  -> Left Tread  (BTS7960-L)
+// CH2 (Right Stick Y) -> Right Tread (BTS7960-R)
+// CH4 (Left Stick X)  -> Turret Rotation Servo (IO23)
+// ============================================================
+
+#define CH2_RIGHT_TREAD 35
+#define CH3_LEFT_TREAD  32
+#define CH4_TURRET      33
+#define TURRET_PWM      23
+#define LED_STATUS      2
+
+#define L_RPWM 25
+#define L_LPWM 26
+#define L_EN   14
+
+#define R_RPWM 27
+#define R_LPWM 13
+#define R_EN   12
+
+const int DEADZONE = 50;
+const int MAX_PWM  = 245;
+unsigned long lastLog = 0;
+
+void driveTrack(int rpwm, int lpwm, int en, int spd) {
+  spd = constrain(spd, -MAX_PWM, MAX_PWM);
+  if (spd > 0) {
+    digitalWrite(en, HIGH); analogWrite(rpwm, spd); analogWrite(lpwm, 0);
+  } else if (spd < 0) {
+    digitalWrite(en, HIGH); analogWrite(rpwm, 0); analogWrite(lpwm, abs(spd));
+  } else {
+    digitalWrite(en, LOW); analogWrite(rpwm, 0); analogWrite(lpwm, 0);
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(CH2_RIGHT_TREAD, INPUT); pinMode(CH3_LEFT_TREAD, INPUT); pinMode(CH4_TURRET, INPUT);
+  pinMode(TURRET_PWM, OUTPUT); pinMode(LED_STATUS, OUTPUT);
+  pinMode(L_RPWM, OUTPUT); pinMode(L_LPWM, OUTPUT); pinMode(L_EN, OUTPUT);
+  pinMode(R_RPWM, OUTPUT); pinMode(R_LPWM, OUTPUT); pinMode(R_EN, OUTPUT);
+
+  Serial.println("[TANK] Dual-Stick Skid-Steer Armored Tank Online!");
+  Serial.println("[HINT] Left Stick Y (CH3)=Left Track | Right Stick Y (CH2)=Right Track | CH4=Turret");
+}
+
+void loop() {
+  long chL = pulseIn(CH3_LEFT_TREAD, HIGH, 25000);
+  long chR = pulseIn(CH2_RIGHT_TREAD, HIGH, 25000);
+  long chT = pulseIn(CH4_TURRET, HIGH, 25000);
+
+  if (chL < 850 || chR < 850) {
+    driveTrack(L_RPWM, L_LPWM, L_EN, 0);
+    driveTrack(R_RPWM, R_LPWM, R_EN, 0);
+    digitalWrite(LED_STATUS, LOW);
+    if (millis() - lastLog > 600) { lastLog = millis(); Serial.println("[FAILSAFE] Tank Halted."); }
+    return;
+  }
+
+  int leftTrack  = (abs(chL - 1500) > DEADZONE) ? map(chL, 1000, 2000, -MAX_PWM, MAX_PWM) : 0;
+  int rightTrack = (abs(chR - 1500) > DEADZONE) ? map(chR, 1000, 2000, -MAX_PWM, MAX_PWM) : 0;
+  int turretOut  = map(constrain(chT, 1000, 2000), 1000, 2000, 0, 255);
+
+  driveTrack(L_RPWM, L_LPWM, L_EN, leftTrack);
+  driveTrack(R_RPWM, R_LPWM, R_EN, rightTrack);
+  analogWrite(TURRET_PWM, turretOut);
+  digitalWrite(LED_STATUS, (leftTrack != 0 || rightTrack != 0) ? HIGH : LOW);
+
+  if (millis() - lastLog > 380) {
+    lastLog = millis();
+    Serial.print("[TANK] L_Tread:"); Serial.print(leftTrack);
+    Serial.print(" R_Tread:"); Serial.print(rightTrack);
+    Serial.print(" Turret:"); Serial.println(turretOut);
+  }
+}`
+        },
+
+        rc_airplane: {
+          name: 'RC Airplane (Throttle + Ail/Elev/Rud)',
+          vehicle: 'airplane',
+          throttleHold: true,
+          readOnly: true,
+          code: `// ============================================================
+// PRESET 5: RC Airplane (4-CH Flight Controller on ESP32)
+// CH3 (Left Y)  -> Main Prop Thrust (BTS7960-L + R Twin Prop)
+// CH1 (Right X) -> Ailerons Roll  (IO21)
+// CH2 (Right Y) -> Elevator Pitch (IO22)
+// CH4 (Left X)  -> Rudder Yaw     (IO23)
+// CH6 (SWB)     -> Arm Prop Safety Switch
+// ============================================================
+
+#define CH1_AILERON  34
+#define CH2_ELEVATOR 35
+#define CH3_THROTTLE 32
+#define CH4_RUDDER   33
+#define CH6_ARM      19
+
+#define AIL_PIN  21
+#define ELEV_PIN 22
+#define RUD_PIN  23
+#define LED_PIN  2
+
+#define L_RPWM 25
+#define L_LPWM 26
+#define L_EN   14
+#define R_RPWM 27
+#define R_LPWM 13
+#define R_EN   12
+
+unsigned long lastLog = 0;
+
+void setPropThrust(int thrust) {
+  thrust = constrain(thrust, 0, 255);
+  if (thrust > 8) {
+    digitalWrite(L_EN, HIGH); digitalWrite(R_EN, HIGH);
+    analogWrite(L_RPWM, thrust); analogWrite(L_LPWM, 0);
+    analogWrite(R_RPWM, thrust); analogWrite(R_LPWM, 0);
+  } else {
+    digitalWrite(L_EN, LOW); digitalWrite(R_EN, LOW);
+    analogWrite(L_RPWM, 0); analogWrite(L_LPWM, 0);
+    analogWrite(R_RPWM, 0); analogWrite(R_LPWM, 0);
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(CH1_AILERON, INPUT); pinMode(CH2_ELEVATOR, INPUT);
+  pinMode(CH3_THROTTLE, INPUT); pinMode(CH4_RUDDER, INPUT);
+  pinMode(CH6_ARM, INPUT);
+  pinMode(AIL_PIN, OUTPUT); pinMode(ELEV_PIN, OUTPUT); pinMode(RUD_PIN, OUTPUT);
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(L_RPWM, OUTPUT); pinMode(L_LPWM, OUTPUT); pinMode(L_EN, OUTPUT);
+  pinMode(R_RPWM, OUTPUT); pinMode(R_LPWM, OUTPUT); pinMode(R_EN, OUTPUT);
+
+  Serial.println("[AERO] ESP32 RC Airplane Flight Controller Ready!");
+  Serial.println("[HINT] Raise Left Stick (CH3) for Thrust | Right Stick = Roll/Pitch.");
+}
+
+void loop() {
+  long ch1 = pulseIn(CH1_AILERON, HIGH, 25000);
+  long ch2 = pulseIn(CH2_ELEVATOR, HIGH, 25000);
+  long ch3 = pulseIn(CH3_THROTTLE, HIGH, 25000);
+  long ch4 = pulseIn(CH4_RUDDER, HIGH, 25000);
+  long ch6 = pulseIn(CH6_ARM, HIGH, 25000);
+
+  if (ch3 < 850 || ch6 < 850) {
+    setPropThrust(0);
+    digitalWrite(LED_PIN, LOW);
+    if (millis() - lastLog > 600) { lastLog = millis(); Serial.println("[FAILSAFE] Prop Cut -> Gliding"); }
+    return;
+  }
+
+  int ail  = map(constrain(ch1, 1000, 2000), 1000, 2000, 0, 255);
+  int elev = map(constrain(ch2, 1000, 2000), 1000, 2000, 0, 255);
+  int rud  = map(constrain(ch4, 1000, 2000), 1000, 2000, 0, 255);
+  analogWrite(AIL_PIN, ail);
+  analogWrite(ELEV_PIN, elev);
+  analogWrite(RUD_PIN, rud);
+
+  int thrust = (ch6 > 1600) ? map(constrain(ch3, 1000, 2000), 1000, 2000, 0, 255) : 0;
+  setPropThrust(thrust);
+  digitalWrite(LED_PIN, thrust > 20 ? HIGH : LOW);
+
+  if (millis() - lastLog > 400) {
+    lastLog = millis();
+    Serial.print("[AERO] THR:"); Serial.print(map(thrust, 0, 255, 0, 100));
+    Serial.print("% AIL:"); Serial.print(ail);
+    Serial.print(" ELV:"); Serial.print(elev);
+    Serial.print(" RUD:"); Serial.println(rud);
+  }
+}`
+        },
+
+        rc_ship: {
+          name: 'RC Ship / Boat (Twin Thruster + Rudder)',
+          vehicle: 'ship',
+          throttleHold: false,
+          readOnly: true,
+          code: `// ============================================================
+// PRESET 6: RC Ship / Boat (Twin Stern Thrusters + Rudder)
+// CH2 (Right Y) -> Forward/Reverse Propulsion
+// CH1 (Right X) -> Rudder Servo (IO23) + Differential Thrust
+// BTS7960-L = Port Thruster | BTS7960-R = Starboard Thruster
+// ============================================================
+
+#define CH1_RUDDER   34
+#define CH2_THROTTLE 35
+#define CH5_FULLAHD  18
+#define RUDDER_PIN   23
+#define LED_NAV      2
+
+#define PORT_RPWM 25
+#define PORT_LPWM 26
+#define PORT_EN   14
+
+#define STBD_RPWM 27
+#define STBD_LPWM 13
+#define STBD_EN   12
+
+const int DEADZONE = 45;
+unsigned long lastLog = 0;
+
+void setThruster(int rpwm, int lpwm, int en, int spd) {
+  spd = constrain(spd, -255, 255);
+  if (spd > 0) {
+    digitalWrite(en, HIGH); analogWrite(rpwm, spd); analogWrite(lpwm, 0);
+  } else if (spd < 0) {
+    digitalWrite(en, HIGH); analogWrite(rpwm, 0); analogWrite(lpwm, abs(spd));
+  } else {
+    digitalWrite(en, LOW); analogWrite(rpwm, 0); analogWrite(lpwm, 0);
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(CH1_RUDDER, INPUT); pinMode(CH2_THROTTLE, INPUT); pinMode(CH5_FULLAHD, INPUT);
+  pinMode(RUDDER_PIN, OUTPUT); pinMode(LED_NAV, OUTPUT);
+  pinMode(PORT_RPWM, OUTPUT); pinMode(PORT_LPWM, OUTPUT); pinMode(PORT_EN, OUTPUT);
+  pinMode(STBD_RPWM, OUTPUT); pinMode(STBD_LPWM, OUTPUT); pinMode(STBD_EN, OUTPUT);
+
+  Serial.println("[SHIP] Twin-Screw RC Vessel & Rudder Online!");
+  Serial.println("[HINT] Right Stick (or WASD): Forward/Astern + Helm Steering.");
+}
+
+void loop() {
+  long ch1 = pulseIn(CH1_RUDDER, HIGH, 25000);
+  long ch2 = pulseIn(CH2_THROTTLE, HIGH, 25000);
+  long ch5 = pulseIn(CH5_FULLAHD, HIGH, 25000);
+
+  if (ch1 < 850 || ch2 < 850) {
+    setThruster(PORT_RPWM, PORT_LPWM, PORT_EN, 0);
+    setThruster(STBD_RPWM, STBD_LPWM, STBD_EN, 0);
+    analogWrite(RUDDER_PIN, 128);
+    digitalWrite(LED_NAV, LOW);
+    if (millis() - lastLog > 600) { lastLog = millis(); Serial.println("[FAILSAFE] All Engines Stop."); }
+    return;
+  }
+
+  int maxPwr = (ch5 > 1600) ? 255 : 185;
+  int rudderServo = map(constrain(ch1, 1000, 2000), 1000, 2000, 0, 255);
+  analogWrite(RUDDER_PIN, rudderServo);
+
+  int surge = (abs(ch2 - 1500) > DEADZONE) ? map(ch2, 1000, 2000, -maxPwr, maxPwr) : 0;
+  int yaw   = (abs(ch1 - 1500) > DEADZONE) ? map(ch1, 1000, 2000, -140, 140) : 0;
+
+  int portThr = constrain(surge + yaw, -maxPwr, maxPwr);
+  int stbdThr = constrain(surge - yaw, -maxPwr, maxPwr);
+
+  setThruster(PORT_RPWM, PORT_LPWM, PORT_EN, portThr);
+  setThruster(STBD_RPWM, STBD_LPWM, STBD_EN, stbdThr);
+  digitalWrite(LED_NAV, (portThr != 0 || stbdThr != 0) ? HIGH : LOW);
+
+  if (millis() - lastLog > 400) {
+    lastLog = millis();
+    Serial.print("[SHIP] PORT:"); Serial.print(portThr);
+    Serial.print(" STBD:"); Serial.print(stbdThr);
+    Serial.print(" RUDDER:"); Serial.println(rudderServo);
+  }
+}`
+        },
+
+        custom_blank: {
+          name: 'Custom Sketch (Blank Arduino Template)',
+          vehicle: 'soccer',
+          throttleHold: false,
+          readOnly: false,
+          code: `// ============================================================
+// CUSTOM ESP32 SKETCH — FlySky FS-i6S + Dual BTS7960 Template
+// Edit freely and click "Compile & Run" or "Save As..."!
+// ============================================================
+
+// FlySky FS-iA6B PWM Receiver Input Pins
+#define CH1_PIN 34   // Right Stick X
+#define CH2_PIN 35   // Right Stick Y
+#define CH3_PIN 32   // Left Stick Y
+#define CH4_PIN 33   // Left Stick X
+#define CH5_PIN 18   // SWA Switch
+#define CH6_PIN 19   // SWB Switch
+#define LED_PIN 2    // Onboard Blue LED
+
+// BTS7960-L (Left Bank)
+#define L_RPWM 25
+#define L_LPWM 26
+#define L_EN   14
+
+// BTS7960-R (Right Bank)
+#define R_RPWM 27
+#define R_LPWM 13
+#define R_EN   12
+
+unsigned long lastPrint = 0;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(CH1_PIN, INPUT); pinMode(CH2_PIN, INPUT);
+  pinMode(L_RPWM, OUTPUT); pinMode(L_LPWM, OUTPUT); pinMode(L_EN, OUTPUT);
+  pinMode(R_RPWM, OUTPUT); pinMode(R_LPWM, OUTPUT); pinMode(R_EN, OUTPUT);
+  pinMode(LED_PIN, OUTPUT);
+
+  Serial.println("[CUSTOM] Custom ESP32 Sketch Ready! Write your logic in loop().");
+}
+
+void loop() {
+  long ch1 = pulseIn(CH1_PIN, HIGH, 25000);
+  long ch2 = pulseIn(CH2_PIN, HIGH, 25000);
+
+  // Example: Simple forward/reverse on CH2
+  int speed = (abs(ch2 - 1500) > 50) ? map(ch2, 1000, 2000, -255, 255) : 0;
+
+  if (speed > 0) {
+    digitalWrite(L_EN, HIGH); digitalWrite(R_EN, HIGH);
+    analogWrite(L_RPWM, speed); analogWrite(L_LPWM, 0);
+    analogWrite(R_RPWM, speed); analogWrite(R_LPWM, 0);
+    digitalWrite(LED_PIN, HIGH);
+  } else if (speed < 0) {
+    digitalWrite(L_EN, HIGH); digitalWrite(R_EN, HIGH);
+    analogWrite(L_RPWM, 0); analogWrite(L_LPWM, abs(speed));
+    analogWrite(R_RPWM, 0); analogWrite(R_LPWM, abs(speed));
+    digitalWrite(LED_PIN, HIGH);
+  } else {
+    digitalWrite(L_EN, LOW); digitalWrite(R_EN, LOW);
+    analogWrite(L_RPWM, 0); analogWrite(L_LPWM, 0);
+    analogWrite(R_RPWM, 0); analogWrite(R_LPWM, 0);
+    digitalWrite(LED_PIN, LOW);
+  }
+
+  if (millis() - lastPrint > 450) {
+    lastPrint = millis();
+    Serial.print("[CUSTOM] CH1="); Serial.print(ch1);
+    Serial.print(" CH2="); Serial.print(ch2);
+    Serial.print(" SPD="); Serial.println(speed);
+  }
+}`
+        }
+      };
+
+      /* =====================================================================
+         2. LOCALSTORAGE SAVED SKETCHES MANAGER
+         ===================================================================== */
+      const STORAGE_KEY = 'esp32_rc_wokwi_lab_saved_sketches_v1';
+
+      function loadSavedSketches() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          const parsed = raw ? JSON.parse(raw) : [];
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          return [];
+        }
+      }
+
+      function persistSavedSketches(list) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+        } catch (e) {
+          showToast('Storage quota exceeded — could not save.', 'error');
+        }
+      }
+
+      /* =====================================================================
+         3. DYNAMIC WOKWI diagram.json GENERATOR (PER PRESET)
+         ===================================================================== */
+      function generateDiagramJson(presetName, vehicle) {
+        const motorNames = {
+          soccer:   ['BTS7960-L (FL+RL)', 'BTS7960-R (FR+RR)'],
+          car:      ['BTS7960-L (Left Drive)', 'BTS7960-R (Right Drive)'],
+          tank:     ['BTS7960-L (Left Tread)', 'BTS7960-R (Right Tread)'],
+          airplane: ['BTS7960-L (Port Prop)', 'BTS7960-R (Stbd Prop)'],
+          ship:     ['BTS7960-L (Port Thruster)', 'BTS7960-R (Stbd Thruster)']
+        }[vehicle] || ['BTS7960-L', 'BTS7960-R'];
+
+        const diagram = {
+          version: 1,
+          author: `ESP32 RC Wokwi Lab — ${presetName}`,
+          editor: 'wokwi',
+          parts: [
+            { type: 'board-esp32-devkit-c-v4', id: 'esp32_dev', top: 100, left: 260, attrs: {} },
+            { type: 'wokwi-potentiometer', id: 'fs_ia6b_ch1', top: 30, left: 20, attrs: { label: 'FS-i6S CH1 (IO34)' } },
+            { type: 'wokwi-potentiometer', id: 'fs_ia6b_ch2', top: 110, left: 20, attrs: { label: 'FS-i6S CH2 (IO35)' } },
+            { type: 'wokwi-potentiometer', id: 'fs_ia6b_ch3', top: 190, left: 20, attrs: { label: 'FS-i6S CH3 (IO32)' } },
+            { type: 'wokwi-potentiometer', id: 'fs_ia6b_ch4', top: 270, left: 20, attrs: { label: 'FS-i6S CH4 (IO33)' } },
+            { type: 'wokwi-slide-switch',  id: 'fs_ia6b_ch5', top: 350, left: 30, attrs: { label: 'SWA CH5 (IO18)' } },
+            { type: 'wokwi-slide-switch',  id: 'fs_ia6b_ch6', top: 410, left: 30, attrs: { label: 'SWB CH6 (IO19)' } },
+            { type: 'wokwi-led', id: 'bts_l_rpwm', top: 50, left: 520, attrs: { color: 'cyan', label: `${motorNames[0]} RPWM (IO25)` } },
+            { type: 'wokwi-led', id: 'bts_l_lpwm', top: 105, left: 520, attrs: { color: 'orange', label: `${motorNames[0]} LPWM (IO26)` } },
+            { type: 'wokwi-led', id: 'bts_l_en',   top: 160, left: 520, attrs: { color: 'purple', label: `${motorNames[0]} EN (IO14)` } },
+            { type: 'wokwi-led', id: 'bts_r_rpwm', top: 245, left: 520, attrs: { color: 'green', label: `${motorNames[1]} RPWM (IO27)` } },
+            { type: 'wokwi-led', id: 'bts_r_lpwm', top: 300, left: 520, attrs: { color: 'red', label: `${motorNames[1]} LPWM (IO13)` } },
+            { type: 'wokwi-led', id: 'bts_r_en',   top: 355, left: 520, attrs: { color: 'limegreen', label: `${motorNames[1]} EN (IO12)` } }
+          ],
+          connections: [
+            ['esp32_dev:TX', '$serialMonitor:RX', '', []],
+            ['esp32_dev:RX', '$serialMonitor:TX', '', []],
+            ['fs_ia6b_ch1:SIG', 'esp32_dev:34', 'cyan', []],
+            ['fs_ia6b_ch2:SIG', 'esp32_dev:35', 'green', []],
+            ['fs_ia6b_ch3:SIG', 'esp32_dev:32', 'gold', []],
+            ['fs_ia6b_ch4:SIG', 'esp32_dev:33', 'violet', []],
+            ['fs_ia6b_ch5:2',   'esp32_dev:18', 'pink', []],
+            ['fs_ia6b_ch6:2',   'esp32_dev:19', 'limegreen', []],
+            ['esp32_dev:25', 'bts_l_rpwm:A', 'cyan', []],
+            ['esp32_dev:26', 'bts_l_lpwm:A', 'orange', []],
+            ['esp32_dev:14', 'bts_l_en:A',   'purple', []],
+            ['esp32_dev:27', 'bts_r_rpwm:A', 'green', []],
+            ['esp32_dev:13', 'bts_r_lpwm:A', 'red', []],
+            ['esp32_dev:12', 'bts_r_en:A',   'limegreen', []]
+          ]
+        };
+
+        if (vehicle === 'car' || vehicle === 'airplane' || vehicle === 'ship' || vehicle === 'tank') {
+          diagram.parts.push({ type: 'wokwi-servo', id: 'aux_servo_21', top: 430, left: 520, attrs: { label: 'Aux Surface / Steer (IO21)' } });
+          diagram.parts.push({ type: 'wokwi-servo', id: 'aux_servo_23', top: 430, left: 660, attrs: { label: 'Rudder / Turret (IO23)' } });
+          diagram.connections.push(['esp32_dev:21', 'aux_servo_21:PWM', 'blue', []]);
+          diagram.connections.push(['esp32_dev:23', 'aux_servo_23:PWM', 'yellow', []]);
+        }
+
+        return JSON.stringify(diagram, null, 2);
+      }
+
+      /* =====================================================================
+         4. GLOBAL SIMULATION & EDITOR STATE
+         ===================================================================== */
+      const sim = {
+        running: false,
+        startTime: performance.now(),
+        delayUntil: 0,
+        compiledProgram: null,
+        serialRxQueue: [],
+        serialBuffer: '',
+        serialLineCount: 0,
+        baudRate: 115200,
+        rafId: null,
+
+        editor: {
+          mode: 'preset',
+          presetKey: 'robosoccer_arcade',
+          savedId: null,
+          title: 'RoboSoccer 4WD (Arcade Drive)',
+          vehicle: 'soccer',
+          readOnly: true,
+          dirty: false
+        },
+
+        rc: {
+          ch1: 1500,
+          ch2: 1500,
+          ch3: 1500,
+          ch4: 1500,
+          ch5: 1000,
+          ch6: 2000,
+          failsafe: false,
+          throttleHold: false
+        },
+
+        gpio: { mode: {}, digital: {}, pwm: {}, ledcChannelPin: {} },
+
+        bts: {
+          left:  { en: false, rpwm: 0, lpwm: 0, dir: 0, pwm: 0, rpm: 0, amps: 0, tempC: 27.5, angle: 0 },
+          right: { en: false, rpwm: 0, lpwm: 0, dir: 0, pwm: 0, rpm: 0, amps: 0, tempC: 27.5, angle: 0 }
+        },
+
+        battery: { nominalV: 12.45, voltage: 12.40, totalAmps: 0.35 },
+
+        keys: { up: false, down: false, left: false, right: false },
+
+        arena: {
+          w: 440, h: 200,
+          score: 0,
+          flash: 0,
+          carCheckpoint: false,
+          bot:  { x: 130, y: 100, angle: 0, vx: 0, vy: 0, speed: 0, steerAngle: 0, turretAngle: 0, altitude: 120, roll: 0, pitch: 0 },
+          ball: { x: 240, y: 100, vx: 0, vy: 0 },
+          wake: []
+        }
+      };
+
+      const RX_PIN_MAP = { 34: 'ch1', 35: 'ch2', 32: 'ch3', 33: 'ch4', 18: 'ch5', 19: 'ch6' };
+
+      /* =====================================================================
+         5. DOM ELEMENT REFERENCES
+         ===================================================================== */
+      const el = {
+        btnCompileRun: document.getElementById('btnCompileRun'),
+        btnStop: document.getElementById('btnStop'),
+        btnReset: document.getElementById('btnReset'),
+        presetSelect: document.getElementById('presetSelect'),
+        savedSketchesGroup: document.getElementById('savedSketchesGroup'),
+        btnCustomize: document.getElementById('btnCustomize'),
+        btnSaveSketch: document.getElementById('btnSaveSketch'),
+        btnExportIno: document.getElementById('btnExportIno'),
+        btnExportDiagram: document.getElementById('btnExportDiagram'),
+
+        tabSketch: document.getElementById('tabSketch'),
+        tabDiagram: document.getElementById('tabDiagram'),
+        compileStatusBadge: document.getElementById('compileStatusBadge'),
+        compileDot: document.getElementById('compileDot'),
+        compileStatusText: document.getElementById('compileStatusText'),
+        editorModeBanner: document.getElementById('editorModeBanner'),
+        bannerIcon: document.getElementById('bannerIcon'),
+        bannerText: document.getElementById('bannerText'),
+        btnBannerCustomize: document.getElementById('btnBannerCustomize'),
+        btnBannerDelete: document.getElementById('btnBannerDelete'),
+        customIdeBar: document.getElementById('customIdeBar'),
+        btnIdeVerify: document.getElementById('btnIdeVerify'),
+        btnIdeFormat: document.getElementById('btnIdeFormat'),
+        btnIdeInsertPins: document.getElementById('btnIdeInsertPins'),
+        sketchEditorContainer: document.getElementById('sketchEditorContainer'),
+        diagramJsonContainer: document.getElementById('diagramJsonContainer'),
+        diagramJsonPre: document.getElementById('diagramJsonPre'),
+        btnCopyDiagram: document.getElementById('btnCopyDiagram'),
+        codeInput: document.getElementById('codeInput'),
+        codeHighlight: document.getElementById('codeHighlight'),
+        lineNumbers: document.getElementById('lineNumbers'),
+        cursorPos: document.getElementById('cursorPos'),
+        simRuntimeClock: document.getElementById('simRuntimeClock'),
+        btnCopyCode: document.getElementById('btnCopyCode'),
+
+        serialTxLed: document.getElementById('serialTxLed'),
+        serialRxLed: document.getElementById('serialRxLed'),
+        baudSelect: document.getElementById('baudSelect'),
+        chkTimestamps: document.getElementById('chkTimestamps'),
+        chkAutoscroll: document.getElementById('chkAutoscroll'),
+        btnClearSerial: document.getElementById('btnClearSerial'),
+        serialOutput: document.getElementById('serialOutput'),
+        serialForm: document.getElementById('serialForm'),
+        serialInput: document.getElementById('serialInput'),
+
+        viewTabCircuit: document.getElementById('viewTabCircuit'),
+        viewTabArena: document.getElementById('viewTabArena'),
+        viewTabSplit: document.getElementById('viewTabSplit'),
+        circuitPanel: document.getElementById('circuitPanel'),
+        arenaPanel: document.getElementById('arenaPanel'),
+        arenaTitle: document.getElementById('arenaTitle'),
+        arenaStatBadge: document.getElementById('arenaStatBadge'),
+        arenaStatVal: document.getElementById('arenaStatVal'),
+        btnResetArena: document.getElementById('btnResetArena'),
+        arenaCanvasWrap: document.getElementById('arenaCanvasWrap'),
+        arenaCanvas: document.getElementById('arenaCanvas'),
+
+        hudVoltage: document.getElementById('hudVoltage'),
+        hudCurrent: document.getElementById('hudCurrent'),
+        hudSignalPill: document.getElementById('hudSignalPill'),
+        hudSignalDot: document.getElementById('hudSignalDot'),
+        hudSignalTxt: document.getElementById('hudSignalTxt'),
+
+        gimbalLeft: document.getElementById('gimbalLeft'),
+        knobLeft: document.getElementById('knobLeft'),
+        gimbalRight: document.getElementById('gimbalRight'),
+        knobRight: document.getElementById('knobRight'),
+        chkThrottleHold: document.getElementById('chkThrottleHold'),
+        kbdDot: document.getElementById('kbdDot'),
+
+        swBoost: document.getElementById('swBoost'),
+        swBoostDot: document.getElementById('swBoostDot'),
+        swBoostTxt: document.getElementById('swBoostTxt'),
+        swArm: document.getElementById('swArm'),
+        swArmDot: document.getElementById('swArmDot'),
+        swArmTxt: document.getElementById('swArmTxt'),
+        swFailsafe: document.getElementById('swFailsafe'),
+        swFsDot: document.getElementById('swFsDot'),
+
+        txCh1Val: document.getElementById('txCh1Val'),
+        txCh2Val: document.getElementById('txCh2Val'),
+        txCh3Val: document.getElementById('txCh3Val'),
+        txCh4Val: document.getElementById('txCh4Val'),
+        txCh5Val: document.getElementById('txCh5Val'),
+        txCh6Val: document.getElementById('txCh6Val'),
+        pwmScopeCanvas: document.getElementById('pwmScopeCanvas'),
+
+        customizeModal: document.getElementById('customizeModal'),
+        closeCustomizeModal: document.getElementById('closeCustomizeModal'),
+        btnCloneCurrent: document.getElementById('btnCloneCurrent'),
+        btnNewBlank: document.getElementById('btnNewBlank'),
+
+        saveModal: document.getElementById('saveModal'),
+        saveForm: document.getElementById('saveForm'),
+        closeSaveModal: document.getElementById('closeSaveModal'),
+        cancelSaveBtn: document.getElementById('cancelSaveBtn'),
+        saveSketchNameInput: document.getElementById('saveSketchNameInput'),
+        saveVehicleModeSelect: document.getElementById('saveVehicleModeSelect'),
+
+        deleteModal: document.getElementById('deleteModal'),
+        deleteModalMsg: document.getElementById('deleteModalMsg'),
+        cancelDeleteBtn: document.getElementById('cancelDeleteBtn'),
+        confirmDeleteBtn: document.getElementById('confirmDeleteBtn'),
+
+        hwTooltip: document.getElementById('hwTooltip'),
+        toastContainer: document.getElementById('toastContainer')
+      };
+
+      /* =====================================================================
+         6. UTILITIES: TOAST, CLIPBOARD, FILE DOWNLOAD
+         ===================================================================== */
+      function showToast(msg, type = 'success') {
+        const div = document.createElement('div');
+        div.className = 'toast-item';
+        if (type === 'error') div.style.borderLeftColor = '#ef4444';
+        if (type === 'info')  div.style.borderLeftColor = '#38bdf8';
+        if (type === 'warn')  div.style.borderLeftColor = '#f59e0b';
+        div.textContent = msg;
+        el.toastContainer.appendChild(div);
+        setTimeout(() => {
+          div.style.opacity = '0';
+          div.style.transition = 'opacity 0.25s ease';
+          setTimeout(() => div.remove(), 260);
+        }, 2600);
+      }
+
+      function copyTextFallback(text) {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          const ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          return ok;
+        } catch {
+          return false;
+        }
+      }
+
+      function copyToClipboard(text, label) {
+        if (window.AndroidBridge && typeof window.AndroidBridge.copyText === 'function') {
+          try { window.AndroidBridge.copyText(text); showToast(`Copied ${label} to clipboard`, 'info'); return; }
+          catch (e) { console.warn('Native clipboard bridge failed', e); }
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text)
+            .then(() => showToast(`Copied ${label} to clipboard`, 'info'))
+            .catch(() => {
+              if (copyTextFallback(text)) showToast(`Copied ${label} to clipboard`, 'info');
+              else showToast(`Could not copy ${label}`, 'error');
+            });
+        } else if (copyTextFallback(text)) {
+          showToast(`Copied ${label} to clipboard`, 'info');
+        } else {
+          showToast(`Could not copy ${label}`, 'error');
+        }
+      }
+
+      function downloadFile(filename, content, mime = 'text/plain') {
+        if (window.AndroidBridge && typeof window.AndroidBridge.saveFile === 'function') {
+          try { window.AndroidBridge.saveFile(filename, content, mime); return; }
+          catch (e) { console.warn('Native file export failed; using browser download', e); }
+        }
+        const blob = new Blob([content], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      /* =====================================================================
+         7. SYNTAX HIGHLIGHTER & EDITOR UX
+         ===================================================================== */
+      function escapeHtml(s) {
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      }
+
+      function highlightCpp(code) {
+        const rx = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|^\s*#\w+[^\n]*|\b(?:void|if|else|for|while|return|switch|case|break|continue|const|true|false)\b|\b(?:int|long|unsigned|float|double|bool|boolean|byte|char|uint8_t|uint16_t|uint32_t|String)\b|\b(?:HIGH|LOW|INPUT|OUTPUT|INPUT_PULLUP|LED_BUILTIN|Serial)\b|\b(?:setup|loop|pinMode|digitalWrite|digitalRead|analogWrite|ledcWrite|ledcSetup|ledcAttachPin|ledcAttach|pulseIn|map|constrain|abs|min|max|millis|micros|delay|print|println|begin|available|readStringUntil|trim|toUpperCase|toLowerCase)\b|\b\d+(?:\.\d+)?\b)/gm;
+        let out = '', last = 0, m;
+        while ((m = rx.exec(code)) !== null) {
+          if (m.index > last) out += escapeHtml(code.slice(last, m.index));
+          const t = m[0];
+          let cls = 'tok-func';
+          if (t.startsWith('//') || t.startsWith('/*')) cls = 'tok-comment';
+          else if (t.startsWith('"') || t.startsWith("'")) cls = 'tok-string';
+          else if (t.trimStart().startsWith('#')) cls = 'tok-macro';
+          else if (/^(void|if|else|for|while|return|switch|case|break|continue|const|true|false)$/.test(t)) cls = 'tok-keyword';
+          else if (/^(int|long|unsigned|float|double|bool|boolean|byte|char|uint8_t|uint16_t|uint32_t|String)$/.test(t)) cls = 'tok-type';
+          else if (/^(HIGH|LOW|INPUT|OUTPUT|INPUT_PULLUP|LED_BUILTIN|Serial)$/.test(t)) cls = 'tok-const';
+          else if (/^\d/.test(t)) cls = 'tok-num';
+          out += `<span class="${cls}">${escapeHtml(t)}</span>`;
+          last = rx.lastIndex;
+        }
+        if (last < code.length) out += escapeHtml(code.slice(last));
+        return out + '\n';
+      }
+
+      function syncEditorVisuals() {
+        const val = el.codeInput.value;
+        el.codeHighlight.innerHTML = highlightCpp(val);
+        const count = val.split('\n').length;
+        let nums = '';
+        for (let i = 1; i <= count; i++) nums += i + '\n';
+        el.lineNumbers.textContent = nums;
+      }
+
+      function updateCursorPos() {
+        const pos = el.codeInput.selectionStart || 0;
+        const lines = el.codeInput.value.slice(0, pos).split('\n');
+        el.cursorPos.textContent = `Ln ${lines.length}, Col ${lines[lines.length - 1].length + 1}`;
+      }
+
+      function updateEditorModeUI() {
+        const ro = sim.editor.readOnly;
+        el.codeInput.readOnly = ro;
+
+        if (ro) {
+          el.editorModeBanner.className = 'shrink-0 px-2.5 py-1.5 border-b border-nordic-border bg-amber-500/10 flex items-center justify-between gap-2 text-[11px]';
+          el.bannerIcon.textContent = '🔒';
+          el.bannerText.className = 'text-amber-200 font-medium truncate';
+          el.bannerText.textContent = 'Built-in Preset (Read-Only) — Click "Customize" or "Save Copy" to edit';
+          el.btnBannerCustomize.classList.remove('hidden');
+          el.btnBannerDelete.classList.add('hidden');
+          el.btnSaveSketch.querySelector('span').textContent = 'Save Copy';
+          el.customIdeBar.classList.add('hidden');
+        } else {
+          el.editorModeBanner.className = 'shrink-0 px-2.5 py-1.5 border-b border-nordic-border bg-indigo-500/15 flex items-center justify-between gap-2 text-[11px]';
+          el.bannerIcon.textContent = '✏️';
+          el.bannerText.className = 'text-indigo-200 font-semibold truncate';
+          const dirtyDot = sim.editor.dirty ? ' •' : '';
+          el.bannerText.textContent = `Custom Editable Mode — ${sim.editor.title}${dirtyDot}`;
+          el.btnBannerCustomize.classList.add('hidden');
+          el.customIdeBar.classList.remove('hidden');
+          if (sim.editor.mode === 'saved') {
+            el.btnBannerDelete.classList.remove('hidden');
+            el.btnSaveSketch.querySelector('span').textContent = 'Save Sketch';
+          } else {
+            el.btnBannerDelete.classList.add('hidden');
+            el.btnSaveSketch.querySelector('span').textContent = 'Save As...';
+          }
+        }
+        el.diagramJsonPre.textContent = generateDiagramJson(sim.editor.title, sim.editor.vehicle);
+      }
+
+      function pulseReadOnlyNotice() {
+        el.editorModeBanner.classList.remove('banner-pulse');
+        void el.editorModeBanner.offsetWidth;
+        el.editorModeBanner.classList.add('banner-pulse');
+        showToast('Built-in preset is Read-Only. Click "Customize" to edit your own copy!', 'warn');
+      }
+
+      el.codeInput.addEventListener('input', () => {
+        sim.editor.dirty = true;
+        syncEditorVisuals();
+        updateCursorPos();
+        updateEditorModeUI();
+      });
+
+      el.codeInput.addEventListener('scroll', () => {
+        el.codeHighlight.scrollTop = el.codeInput.scrollTop;
+        el.codeHighlight.scrollLeft = el.codeInput.scrollLeft;
+        el.lineNumbers.scrollTop = el.codeInput.scrollTop;
+      });
+
+      el.codeInput.addEventListener('keyup', updateCursorPos);
+      el.codeInput.addEventListener('click', updateCursorPos);
+
+      el.codeInput.addEventListener('keydown', (e) => {
+        if (sim.editor.readOnly) {
+          const navKeys = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End','PageUp','PageDown','Shift','Control','Meta','Alt','Escape'];
+          if (!navKeys.includes(e.key) && !(e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            pulseReadOnlyNotice();
+          }
+          return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          el.btnSaveSketch.click();
+          return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          e.preventDefault();
+          el.btnCompileRun.click();
+          return;
+        }
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          const s = el.codeInput.selectionStart;
+          const end = el.codeInput.selectionEnd;
+          const v = el.codeInput.value;
+          el.codeInput.value = v.slice(0, s) + '  ' + v.slice(end);
+          el.codeInput.selectionStart = el.codeInput.selectionEnd = s + 2;
+          sim.editor.dirty = true;
+          syncEditorVisuals();
+          updateCursorPos();
+          updateEditorModeUI();
+        }
+      });
+
+      /* =====================================================================
+         8. PRESET & SAVED SKETCH LOADING WORKFLOW
+         ===================================================================== */
+      function refreshSavedDropdown() {
+        const list = loadSavedSketches();
+        el.savedSketchesGroup.innerHTML = '';
+        if (list.length === 0) {
+          const emptyOpt = document.createElement('option');
+          emptyOpt.disabled = true;
+          emptyOpt.textContent = '— No saved sketches yet —';
+          el.savedSketchesGroup.appendChild(emptyOpt);
+        } else {
+          list.forEach(item => {
+            const opt = document.createElement('option');
+            opt.value = `saved:${item.id}`;
+            opt.textContent = `★ ${item.name}`;
+            el.savedSketchesGroup.appendChild(opt);
+          });
+        }
+      }
+
+      function applyVehicleTheme(vehicle, throttleHold = false) {
+        sim.editor.vehicle = vehicle;
+        sim.rc.throttleHold = throttleHold;
+        el.chkThrottleHold.checked = throttleHold;
+
+        if (throttleHold) {
+          sim.rc.ch3 = 1000;
+          setKnobVisual(el.knobLeft, (sim.rc.ch4 - 1500) / 500, -1);
+        } else {
+          sim.rc.ch3 = 1500;
+          setKnobVisual(el.knobLeft, 0, 0);
+        }
+
+        const labels = {
+          soccer:   ['M1: FRONT-LEFT',  'M2: REAR-LEFT',   'M3: FRONT-RIGHT', 'M4: REAR-RIGHT'],
+          car:      ['M1: FRONT-LEFT',  'M2: REAR-LEFT',   'M3: FRONT-RIGHT', 'M4: REAR-RIGHT'],
+          tank:     ['M1: L-TREAD FWD', 'M2: L-TREAD AFT', 'M3: R-TREAD FWD', 'M4: R-TREAD AFT'],
+          airplane: ['M1: PORT PROP',   'M2: PORT AUX',    'M3: STBD PROP',   'M4: STBD AUX'],
+          ship:     ['M1: PORT THRUST', 'M2: PORT PUMP',   'M3: STBD THRUST', 'M4: STBD PUMP']
+        }[vehicle] || ['M1: FRONT-LEFT', 'M2: REAR-LEFT', 'M3: FRONT-RIGHT', 'M4: REAR-RIGHT'];
+
+        document.getElementById('mFLLabel').textContent = labels[0];
+        document.getElementById('mRLLabel').textContent = labels[1];
+        document.getElementById('mFRLabel').textContent = labels[2];
+        document.getElementById('mRRLabel').textContent = labels[3];
+
+        const arenaMeta = {
+          soccer:   ['2D RoboSoccer Pitch', 'GOALS'],
+          car:      ['2D RC Car Racetrack', 'LAPS'],
+          tank:     ['2D Tactical Tank Proving Ground', 'TARGETS'],
+          airplane: ['2D Flight Corridor & HUD', 'ALT (ft)'],
+          ship:     ['2D Maritime Water Basin', 'BUOYS']
+        }[vehicle] || ['2D RoboSoccer Pitch', 'GOALS'];
+
+        el.arenaTitle.textContent = arenaMeta[0];
+        sim.arena.score = 0;
+        el.arenaStatBadge.innerHTML = `${arenaMeta[1]}: <strong id="arenaStatVal" class="text-amber-400">0</strong>`;
+        el.arenaStatVal = document.getElementById('arenaStatVal');
+        resetArenaScene();
+      }
+
+      function loadBuiltInPreset(key) {
+        const p = BUILTIN_PRESETS[key] || BUILTIN_PRESETS.robosoccer_arcade;
+        sim.editor = {
+          mode: p.readOnly ? 'preset' : 'custom_unsaved',
+          presetKey: key,
+          savedId: null,
+          title: p.name,
+          vehicle: p.vehicle,
+          readOnly: p.readOnly,
+          dirty: false
+        };
+        el.presetSelect.value = `preset:${key}`;
+        el.codeInput.value = p.code;
+        syncEditorVisuals();
+        applyVehicleTheme(p.vehicle, p.throttleHold);
+        updateEditorModeUI();
+        clearSerialConsole();
+        compileAndRunSketch();
+      }
+
+      function loadSavedSketchById(id) {
+        const list = loadSavedSketches();
+        const found = list.find(s => s.id === id);
+        if (!found) return;
+        sim.editor = {
+          mode: 'saved',
+          presetKey: null,
+          savedId: found.id,
+          title: found.name,
+          vehicle: found.vehicle || 'soccer',
+          readOnly: false,
+          dirty: false
+        };
+        el.presetSelect.value = `saved:${found.id}`;
+        el.codeInput.value = found.code;
+        syncEditorVisuals();
+        applyVehicleTheme(sim.editor.vehicle, sim.editor.vehicle === 'airplane');
+        updateEditorModeUI();
+        clearSerialConsole();
+        compileAndRunSketch();
+      }
+
+      /* =====================================================================
+         9. SERIAL MONITOR ENGINE (DEDICATED MIDDLE COLUMN)
+         ===================================================================== */
+      function formatTimeShort() {
+        const d = new Date();
+        const p = (n, l = 2) => String(n).padStart(l, '0');
+        return `${p(d.getMinutes())}:${p(d.getSeconds())}.${p(Math.floor(d.getMilliseconds() / 10))}`;
+      }
+
+      function flashLed(ledEl, colorClass) {
+        ledEl.className = `w-2 h-2 rounded-full ${colorClass}`;
+        clearTimeout(ledEl._t);
+        ledEl._t = setTimeout(() => {
+          ledEl.className = 'w-2 h-2 rounded-full bg-slate-600 transition-colors';
+        }, 90);
+      }
+
+      function clearSerialConsole() {
+        el.serialOutput.innerHTML = '';
+        sim.serialLineCount = 0;
+        sim.serialBuffer = '';
+      }
+
+      function appendSerialLine(text, kind = 'normal') {
+        const row = document.createElement('div');
+        row.className = 'break-all leading-snug';
+
+        if (el.chkTimestamps.checked) {
+          const ts = document.createElement('span');
+          ts.className = 'text-slate-600 mr-1.5 select-none text-[10px]';
+          ts.textContent = `[${formatTimeShort()}]`;
+          row.appendChild(ts);
+        }
+
+        const span = document.createElement('span');
+        if (kind === 'error') span.className = 'text-red-400 font-semibold';
+        else if (kind === 'system') span.className = 'text-sky-400';
+        else if (kind === 'tx') span.className = 'text-amber-300';
+        else if (/FAILSAFE|STOP|DISARMED|ERROR/i.test(text)) span.className = 'text-amber-400';
+        else if (/TURBO|READY|ONLINE|ARMED/i.test(text)) span.className = 'text-emerald-400';
+        else span.className = 'text-slate-200';
+
+        span.textContent = text;
+        row.appendChild(span);
+        el.serialOutput.appendChild(row);
+        sim.serialLineCount++;
+
+        while (sim.serialLineCount > 350 && el.serialOutput.firstChild) {
+          el.serialOutput.removeChild(el.serialOutput.firstChild);
+          sim.serialLineCount--;
+        }
+        if (el.chkAutoscroll.checked) {
+          el.serialOutput.scrollTop = el.serialOutput.scrollHeight;
+        }
+        if (kind !== 'tx') flashLed(el.serialTxLed, 'bg-emerald-400 led-green');
+      }
+
+      function flushSerialPrint(chunk, newline = false) {
+        sim.serialBuffer += String(chunk);
+        if (newline || sim.serialBuffer.includes('\n')) {
+          const parts = sim.serialBuffer.split('\n');
+          if (newline) {
+            parts.forEach(p => appendSerialLine(p));
+            sim.serialBuffer = '';
+          } else {
+            const rem = parts.pop();
+            parts.forEach(p => appendSerialLine(p));
+            sim.serialBuffer = rem;
+          }
+        }
+      }
+
+      /* =====================================================================
+         10. LIVE ESP32 ARDUINO C++ TRANSPILER & RUNTIME ENGINE
+         ===================================================================== */
+      if (!String.prototype.toInt) {
+        Object.defineProperty(String.prototype, 'toInt', { value() { return parseInt(this, 10) || 0; }, configurable: true });
+      }
+      if (!String.prototype.toFloat) {
+        Object.defineProperty(String.prototype, 'toFloat', { value() { return parseFloat(this) || 0; }, configurable: true });
+      }
+      if (!String.prototype.equals) {
+        Object.defineProperty(String.prototype, 'equals', { value(o) { return String(this) === String(o); }, configurable: true });
+      }
+
+      function transpileArduinoCpp(source) {
+        const literals = [];
+        let code = source
+          .replace(/\/\*[\s\S]*?\*\//g, ' ')
+          .replace(/("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|(\/\/[^\n]*)/g, (m, strLit, comment) => {
+            if (comment) return '';
+            const idx = literals.length;
+            literals.push(strLit);
+            return `__STR_${idx}__`;
+          });
+
+        const macros = [];
+        code = code.replace(/^\s*#include\s+[^\n]*$/gm, '');
+        code = code.replace(/^\s*#define\s+([A-Za-z_]\w*)\s+([^\n]+)$/gm, (_, name, value) => {
+          macros.push({ name, value: value.trim() });
+          return '';
+        });
+        macros.sort((a, b) => b.name.length - a.name.length);
+        for (const m of macros) {
+          code = code.replace(new RegExp(`\\b${m.name}\\b`, 'g'), `(${m.value})`);
+        }
+
+        code = code.replace(/\b([A-Za-z_]\w*)\.trim\s*\(\s*\)\s*;/g, '$1 = String($1).trim();');
+        code = code.replace(/\b([A-Za-z_]\w*)\.toUpperCase\s*\(\s*\)\s*;/g, '$1 = String($1).toUpperCase();');
+        code = code.replace(/\b([A-Za-z_]\w*)\.toLowerCase\s*\(\s*\)\s*;/g, '$1 = String($1).toLowerCase();');
+
+        const types = '(?:unsigned\\s+long|unsigned\\s+int|long\\s+long|void|int|long|float|double|bool|boolean|byte|char|uint8_t|uint16_t|uint32_t|int16_t|int32_t|String)';
+
+        code = code.replace(new RegExp(`\\b${types}\\s+([A-Za-z_]\\w*)\\s*\\(([^)]*)\\)\\s*\\{`, 'g'), (_, fn, params) => {
+          const cleanParams = params
+            .split(',')
+            .map(p => p.trim())
+            .filter(Boolean)
+            .map(p => p.replace(new RegExp(`^(?:const\\s+)?${types}\\s*\\*?\\s*`), '').replace(/\[.*\]/, '').trim())
+            .join(', ');
+          return `function ${fn}(${cleanParams}) {`;
+        });
+
+        code = code.replace(new RegExp(`\\bconst\\s+${types}\\s+`, 'g'), 'const ');
+        code = code.replace(new RegExp(`\\b${types}\\s+(?=[A-Za-z_]\\w*)`, 'g'), 'let ');
+
+        code = code.replace(/\(\s*(?:int|long|uint8_t|byte)\s*\)/g, 'Math.trunc');
+        code = code.replace(/\(\s*(?:float|double)\s*\)/g, 'Number');
+
+        code = code.replace(/__STR_(\d+)__/g, (_, i) => literals[Number(i)]);
+        return code;
+      }
+
+      function createEsp32Runtime() {
+        return {
+          HIGH: 1, LOW: 0, INPUT: 0, OUTPUT: 1, INPUT_PULLUP: 2, LED_BUILTIN: 2,
+
+          pinMode(pin, mode) { sim.gpio.mode[pin] = mode; },
+
+          digitalWrite(pin, val) {
+            const v = val ? 1 : 0;
+            sim.gpio.digital[pin] = v;
+            if (pin === 25 || pin === 26 || pin === 27 || pin === 13) {
+              sim.gpio.pwm[pin] = v ? 255 : 0;
+            }
+          },
+
+          digitalRead(pin) {
+            if (RX_PIN_MAP[pin]) return getReceiverPulseUs(RX_PIN_MAP[pin]) > 1500 ? 1 : 0;
+            return sim.gpio.digital[pin] ? 1 : 0;
+          },
+
+          analogWrite(pin, val) {
+            sim.gpio.pwm[pin] = Math.max(0, Math.min(255, Math.round(Number(val) || 0)));
+          },
+
+          ledcSetup(ch, freq, res) { sim.gpio.ledcChannelPin[ch] = sim.gpio.ledcChannelPin[ch] ?? ch; },
+          ledcAttachPin(pin, ch)   { sim.gpio.ledcChannelPin[ch] = pin; },
+          ledcAttach(pin, f, r)    { sim.gpio.ledcChannelPin[pin] = pin; },
+          ledcWrite(chOrPin, duty) {
+            const pin = sim.gpio.ledcChannelPin[chOrPin] ?? chOrPin;
+            sim.gpio.pwm[pin] = Math.max(0, Math.min(255, Math.round(Number(duty) || 0)));
+          },
+
+          pulseIn(pin, state, timeout = 25000) {
+            const chKey = RX_PIN_MAP[pin];
+            return chKey ? getReceiverPulseUs(chKey) : 0;
+          },
+
+          map(x, inMin, inMax, outMin, outMax) {
+            if (inMax === inMin) return outMin;
+            return Math.trunc(((x - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin);
+          },
+          constrain(x, a, b) { return Math.min(Math.max(x, a), b); },
+          abs(x) { return Math.abs(x); },
+          min(a, b) { return Math.min(a, b); },
+          max(a, b) { return Math.max(a, b); },
+          sq(x) { return x * x; },
+          sqrt(x) { return Math.sqrt(x); },
+          pow(a, b) { return Math.pow(a, b); },
+          round(x) { return Math.round(x); },
+          millis() { return Math.floor(performance.now() - sim.startTime); },
+          micros() { return Math.floor((performance.now() - sim.startTime) * 1000); },
+          delay(ms) { sim.delayUntil = performance.now() + Math.max(0, Math.min(5000, Number(ms) || 0)); },
+
+          Serial: {
+            begin(baud) {
+              sim.baudRate = baud || 115200;
+              if (el.baudSelect) {
+                const opt = Array.from(el.baudSelect.options).find(o => Number(o.value) === Number(baud));
+                if (opt) el.baudSelect.value = opt.value;
+              }
+            },
+            print(v = '')   { flushSerialPrint(v, false); },
+            println(v = '') { flushSerialPrint(v, true); },
+            available()     { return sim.serialRxQueue.length; },
+            read() {
+              if (!sim.serialRxQueue.length) return -1;
+              const s = sim.serialRxQueue[0];
+              const c = s.charCodeAt(0);
+              if (s.length <= 1) sim.serialRxQueue.shift();
+              else sim.serialRxQueue[0] = s.slice(1);
+              return c;
+            },
+            readString()      { return sim.serialRxQueue.length ? sim.serialRxQueue.shift() : ''; },
+            readStringUntil() { return sim.serialRxQueue.length ? sim.serialRxQueue.shift() : ''; }
+          }
+        };
+      }
+
+      function setCompileBadge(state, text) {
+        el.compileStatusText.textContent = text;
+        if (state === 'ok') {
+          el.compileStatusBadge.className = 'mb-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 truncate max-w-[165px]';
+          el.compileDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0';
+        } else if (state === 'error') {
+          el.compileStatusBadge.className = 'mb-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-red-500/15 text-red-400 border border-red-500/30 flex items-center gap-1.5 truncate max-w-[165px]';
+          el.compileDot.className = 'w-1.5 h-1.5 rounded-full bg-red-400 shrink-0';
+        } else {
+          el.compileStatusBadge.className = 'mb-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-slate-700/40 text-slate-400 border border-slate-600/40 flex items-center gap-1.5 truncate max-w-[165px]';
+          el.compileDot.className = 'w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0';
+        }
+      }
+
+      function resetGpioAndDrivers() {
+        sim.gpio = { mode: {}, digital: {}, pwm: { 21: 128, 22: 128, 23: 128 }, ledcChannelPin: {} };
+        ['left', 'right'].forEach(side => {
+          sim.bts[side].en = false;
+          sim.bts[side].rpwm = 0;
+          sim.bts[side].lpwm = 0;
+          sim.bts[side].dir = 0;
+          sim.bts[side].pwm = 0;
+          sim.bts[side].rpm = 0;
+          sim.bts[side].amps = 0;
+        });
+      }
+
+      function compileAndRunSketch() {
+        const src = el.codeInput.value;
+        resetGpioAndDrivers();
+        sim.serialBuffer = '';
+        sim.serialRxQueue = [];
+        sim.startTime = performance.now();
+        sim.delayUntil = 0;
+
+        try {
+          const js = transpileArduinoCpp(src);
+          const rt = createEsp32Runtime();
+          const body = `
+            "use strict";
+            const {
+              HIGH, LOW, INPUT, OUTPUT, INPUT_PULLUP, LED_BUILTIN,
+              pinMode, digitalWrite, digitalRead, analogWrite,
+              ledcSetup, ledcAttachPin, ledcAttach, ledcWrite,
+              pulseIn, map, constrain, abs, min, max, sq, sqrt, pow, round,
+              millis, micros, delay, Serial
+            } = __rt;
+            ${js}
+            return {
+              setup: typeof setup === 'function' ? setup : () => {},
+              loop:  typeof loop  === 'function' ? loop  : () => {}
+            };
+          `;
+          const prog = new Function('__rt', body)(rt);
+          const flashPct = Math.min(88, Math.max(19, Math.round(18 + src.length / 400)));
+          setCompileBadge('ok', `OK • Flash ${flashPct}%`);
+          appendSerialLine(`--- ESP32 Boot (${sim.baudRate} baud) ---`, 'system');
+
+          sim.compiledProgram = prog;
+          sim.running = true;
+          prog.setup();
+          return true;
+        } catch (err) {
+          sim.running = false;
+          sim.compiledProgram = null;
+          setCompileBadge('error', 'Compile Error');
+          appendSerialLine(`[COMPILE ERR] ${err.message || err}`, 'error');
+          showToast('Sketch compile error — check Serial Monitor', 'error');
+          return false;
+        }
+      }
+
+      function stopSimulation() {
+        sim.running = false;
+        resetGpioAndDrivers();
+        setCompileBadge('idle', 'Stopped');
+        appendSerialLine('--- ESP32 Halted ---', 'system');
+      }
+
+      /* =====================================================================
+         11. VIRTUAL FLYSKY FS-i6S TRANSMITTER (GIMBALS, SWITCHES, WASD, SCOPE)
+         ===================================================================== */
+      function getReceiverPulseUs(chKey) {
+        if (sim.rc.failsafe) return 0;
+        return Math.round(sim.rc[chKey] ?? 1500);
+      }
+
+      function setKnobVisual(knobEl, nx, ny) {
+        const maxPx = 35;
+        knobEl.style.transform = `translate(${nx * maxPx}px, ${-ny * maxPx}px)`;
+      }
+
+      function bindGimbal(wellEl, knobEl, onMove, shouldCenterY) {
+        let pid = null;
+        function applyPointer(cx, cy) {
+          const r = wellEl.getBoundingClientRect();
+          const mx = r.left + r.width / 2;
+          const my = r.top + r.height / 2;
+          const maxR = r.width / 2 - 18;
+          let dx = cx - mx, dy = cy - my;
+          const d = Math.hypot(dx, dy);
+          if (d > maxR) { dx = (dx / d) * maxR; dy = (dy / d) * maxR; }
+          const nx = dx / maxR;
+          const ny = -dy / maxR;
+          setKnobVisual(knobEl, nx, ny);
+          onMove(nx, ny);
+        }
+        wellEl.addEventListener('pointerdown', (e) => {
+          pid = e.pointerId;
+          wellEl.setPointerCapture(pid);
+          applyPointer(e.clientX, e.clientY);
+        });
+        wellEl.addEventListener('pointermove', (e) => {
+          if (e.pointerId === pid) applyPointer(e.clientX, e.clientY);
+        });
+        function endDrag(e) {
+          if (e.pointerId !== pid) return;
+          pid = null;
+          const cy = shouldCenterY() ? 0 : ((sim.rc.ch3 - 1500) / 500);
+          setKnobVisual(knobEl, 0, cy);
+          onMove(0, cy);
+        }
+        wellEl.addEventListener('pointerup', endDrag);
+        wellEl.addEventListener('pointercancel', endDrag);
+      }
+
+      bindGimbal(
+        el.gimbalLeft, el.knobLeft,
+        (nx, ny) => {
+          sim.rc.ch4 = Math.round(1500 + nx * 500);
+          sim.rc.ch3 = Math.round(1500 + ny * 500);
+        },
+        () => !sim.rc.throttleHold
+      );
+
+      bindGimbal(
+        el.gimbalRight, el.knobRight,
+        (nx, ny) => {
+          sim.rc.ch1 = Math.round(1500 + nx * 500);
+          sim.rc.ch2 = Math.round(1500 + ny * 500);
+        },
+        () => true
+      );
+
+      el.chkThrottleHold.addEventListener('change', () => {
+        sim.rc.throttleHold = el.chkThrottleHold.checked;
+        if (!sim.rc.throttleHold) {
+          sim.rc.ch3 = 1500;
+          setKnobVisual(el.knobLeft, (sim.rc.ch4 - 1500) / 500, 0);
+        }
+      });
+
+      function updateSwitchUI() {
+        const boost = sim.rc.ch5 > 1500;
+        el.swBoostTxt.textContent = boost ? 'BOOST' : 'NORM';
+        el.swBoost.className = boost
+          ? 'px-2 py-1 rounded-md text-[10.5px] font-mono font-semibold bg-amber-500/20 border border-amber-400 text-amber-300 transition cursor-pointer flex items-center gap-1.5'
+          : 'px-2 py-1 rounded-md text-[10.5px] font-mono font-semibold bg-nordic-bg border border-slate-700 text-slate-300 hover:border-amber-400/70 transition cursor-pointer flex items-center gap-1.5';
+        el.swBoostDot.className = boost ? 'w-2 h-2 rounded-full bg-amber-400 led-amber' : 'w-2 h-2 rounded-full bg-slate-500';
+
+        const armed = sim.rc.ch6 > 1500;
+        el.swArmTxt.textContent = armed ? 'ARM' : 'SAFE';
+        el.swArm.className = armed
+          ? 'px-2 py-1 rounded-md text-[10.5px] font-mono font-semibold bg-emerald-500/15 border border-emerald-500/50 text-emerald-300 transition cursor-pointer flex items-center gap-1.5'
+          : 'px-2 py-1 rounded-md text-[10.5px] font-mono font-semibold bg-nordic-bg border border-slate-700 text-slate-400 transition cursor-pointer flex items-center gap-1.5';
+        el.swArmDot.className = armed ? 'w-2 h-2 rounded-full bg-emerald-400 led-green' : 'w-2 h-2 rounded-full bg-slate-500';
+
+        const fs = sim.rc.failsafe;
+        el.swFailsafe.className = fs
+          ? 'px-2 py-1 rounded-md text-[10.5px] font-mono font-semibold bg-red-500/25 border border-red-500 text-red-300 transition cursor-pointer flex items-center gap-1.5'
+          : 'px-2 py-1 rounded-md text-[10.5px] font-mono font-semibold bg-nordic-bg border border-slate-700 text-slate-300 hover:border-red-500/70 transition cursor-pointer flex items-center gap-1.5';
+        el.swFsDot.className = fs ? 'w-2 h-2 rounded-full bg-red-500 led-red animate-pulse' : 'w-2 h-2 rounded-full bg-slate-500';
+
+        if (fs) {
+          el.hudSignalPill.className = 'flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-500/20 text-red-300 border border-red-500/50 font-bold';
+          el.hudSignalDot.className = 'w-1.5 h-1.5 rounded-full bg-red-500 led-red animate-pulse';
+          el.hudSignalTxt.textContent = 'FAILSAFE';
+        } else {
+          el.hudSignalPill.className = 'flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/35 font-bold';
+          el.hudSignalDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400 led-green';
+          el.hudSignalTxt.textContent = 'LINK OK';
+        }
+      }
+
+      el.swBoost.addEventListener('click', () => { sim.rc.ch5 = sim.rc.ch5 > 1500 ? 1000 : 2000; updateSwitchUI(); });
+      el.swArm.addEventListener('click',   () => { sim.rc.ch6 = sim.rc.ch6 > 1500 ? 1000 : 2000; updateSwitchUI(); });
+      el.swFailsafe.addEventListener('click', () => {
+        sim.rc.failsafe = !sim.rc.failsafe;
+        updateSwitchUI();
+        showToast(sim.rc.failsafe ? 'FS-i6S Signal Loss (0µs Failsafe)' : 'FS-i6S 2.4GHz Link Restored', sim.rc.failsafe ? 'error' : 'success');
+      });
+
+      function isTextFocus() {
+        const t = document.activeElement?.tagName;
+        return t === 'TEXTAREA' || t === 'INPUT' || t === 'SELECT';
+      }
+
+      window.addEventListener('keydown', (e) => {
+        if (isTextFocus()) return;
+        let used = true;
+        if (e.code === 'KeyW' || e.code === 'ArrowUp') sim.keys.up = true;
+        else if (e.code === 'KeyS' || e.code === 'ArrowDown') sim.keys.down = true;
+        else if (e.code === 'KeyA' || e.code === 'ArrowLeft') sim.keys.left = true;
+        else if (e.code === 'KeyD' || e.code === 'ArrowRight') sim.keys.right = true;
+        else used = false;
+        if (used) e.preventDefault();
+      });
+
+      window.addEventListener('keyup', (e) => {
+        if (e.code === 'KeyW' || e.code === 'ArrowUp') sim.keys.up = false;
+        else if (e.code === 'KeyS' || e.code === 'ArrowDown') sim.keys.down = false;
+        else if (e.code === 'KeyA' || e.code === 'ArrowLeft') sim.keys.left = false;
+        else if (e.code === 'KeyD' || e.code === 'ArrowRight') sim.keys.right = false;
+      });
+
+      let kbdActive = false;
+      function stepKeyboardControl() {
+        const any = sim.keys.up || sim.keys.down || sim.keys.left || sim.keys.right;
+        if (any) {
+          kbdActive = true;
+          const ny = (sim.keys.up ? 1 : 0) - (sim.keys.down ? 1 : 0);
+          const nx = (sim.keys.right ? 1 : 0) - (sim.keys.left ? 1 : 0);
+
+          if (sim.editor.vehicle === 'tank') {
+            const tL = 1500 + Math.max(-1, Math.min(1, ny + nx)) * 500;
+            const tR = 1500 + Math.max(-1, Math.min(1, ny - nx)) * 500;
+            sim.rc.ch3 += (tL - sim.rc.ch3) * 0.35;
+            sim.rc.ch2 += (tR - sim.rc.ch2) * 0.35;
+            setKnobVisual(el.knobLeft, 0, (sim.rc.ch3 - 1500) / 500);
+            setKnobVisual(el.knobRight, 0, (sim.rc.ch2 - 1500) / 500);
+          } else if (sim.editor.vehicle === 'airplane') {
+            if (ny !== 0) sim.rc.ch3 = Math.max(1000, Math.min(2000, sim.rc.ch3 + ny * 18));
+            sim.rc.ch1 += (1500 + nx * 500 - sim.rc.ch1) * 0.35;
+            setKnobVisual(el.knobLeft, (sim.rc.ch4 - 1500) / 500, (sim.rc.ch3 - 1500) / 500);
+            setKnobVisual(el.knobRight, (sim.rc.ch1 - 1500) / 500, (sim.rc.ch2 - 1500) / 500);
+          } else {
+            sim.rc.ch2 += (1500 + ny * 500 - sim.rc.ch2) * 0.35;
+            sim.rc.ch1 += (1500 + nx * 500 - sim.rc.ch1) * 0.35;
+            setKnobVisual(el.knobRight, (sim.rc.ch1 - 1500) / 500, (sim.rc.ch2 - 1500) / 500);
+          }
+          el.kbdDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400 led-green';
+        } else if (kbdActive) {
+          sim.rc.ch1 += (1500 - sim.rc.ch1) * 0.4;
+          sim.rc.ch2 += (1500 - sim.rc.ch2) * 0.4;
+          if (!sim.rc.throttleHold) sim.rc.ch3 += (1500 - sim.rc.ch3) * 0.4;
+          if (Math.abs(sim.rc.ch1 - 1500) < 4 && Math.abs(sim.rc.ch2 - 1500) < 4 && (sim.rc.throttleHold || Math.abs(sim.rc.ch3 - 1500) < 4)) {
+            sim.rc.ch1 = 1500;
+            sim.rc.ch2 = 1500;
+            if (!sim.rc.throttleHold) sim.rc.ch3 = 1500;
+            kbdActive = false;
+            el.kbdDot.className = 'w-1.5 h-1.5 rounded-full bg-slate-500';
+          }
+          setKnobVisual(el.knobRight, (sim.rc.ch1 - 1500) / 500, (sim.rc.ch2 - 1500) / 500);
+          setKnobVisual(el.knobLeft, (sim.rc.ch4 - 1500) / 500, (sim.rc.ch3 - 1500) / 500);
+        }
+      }
+
+      /* =====================================================================
+         12. FS-i6S 6-CHANNEL 50Hz PWM OSCILLOSCOPE
+         ===================================================================== */
+      const scopeCtx = el.pwmScopeCanvas.getContext('2d');
+      let scopePhase = 0;
+
+      function resizeScope() {
+        const r = el.pwmScopeCanvas.parentElement.getBoundingClientRect();
+        if (r.width > 10 && r.height > 10) {
+          const dpr = Math.min(window.devicePixelRatio || 1, 2);
+          el.pwmScopeCanvas.width = Math.floor(r.width * dpr);
+          el.pwmScopeCanvas.height = Math.floor(r.height * dpr);
+          scopeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+      }
+
+      function drawPwmScope(dt) {
+        const w = el.pwmScopeCanvas.clientWidth;
+        const h = el.pwmScopeCanvas.clientHeight;
+        if (!w || !h) return;
+        scopeCtx.clearRect(0, 0, w, h);
+
+        scopeCtx.strokeStyle = 'rgba(51, 65, 85, 0.3)';
+        scopeCtx.lineWidth = 1;
+        for (let x = 0; x < w; x += 26) {
+          scopeCtx.beginPath(); scopeCtx.moveTo(x, 0); scopeCtx.lineTo(x, h); scopeCtx.stroke();
+        }
+
+        const chs = [
+          { k: 'ch1', c: '#38bdf8' },
+          { k: 'ch2', c: '#10b981' },
+          { k: 'ch3', c: '#f59e0b' },
+          { k: 'ch4', c: '#a78bfa' },
+          { k: 'ch5', c: '#f472b6' },
+          { k: 'ch6', c: '#a3e635' }
+        ];
+        scopePhase = (scopePhase + dt * 52) % 86;
+        const rowH = h / 6;
+
+        chs.forEach((ch, i) => {
+          const us = getReceiverPulseUs(ch.k);
+          const baseY = rowH * i + rowH - 2.5;
+          const hiY   = rowH * i + 2.5;
+          scopeCtx.strokeStyle = us === 0 ? 'rgba(239,68,68,0.65)' : ch.c;
+          scopeCtx.lineWidth = 1.4;
+          scopeCtx.beginPath();
+          if (us === 0) {
+            scopeCtx.moveTo(0, baseY); scopeCtx.lineTo(w, baseY); scopeCtx.stroke();
+            return;
+          }
+          const period = 86;
+          const pw = 12 + ((us - 1000) / 1000) * 42;
+          let x = -scopePhase;
+          scopeCtx.moveTo(0, baseY);
+          while (x < w + period) {
+            scopeCtx.lineTo(x, baseY);
+            scopeCtx.lineTo(x, hiY);
+            scopeCtx.lineTo(x + pw, hiY);
+            scopeCtx.lineTo(x + pw, baseY);
+            x += period;
+          }
+          scopeCtx.stroke();
+        });
+      }
+
+      /* =====================================================================
+         13. DUAL BTS7960 ELECTRICAL PHYSICS & SVG CIRCUIT RENDERER
+         ===================================================================== */
+      function evalBTS7960(rpwmPin, lpwmPin, enPin, prevTemp, dt) {
+        const en = Boolean(sim.gpio.digital[enPin] || (sim.gpio.pwm[enPin] || 0) > 127);
+        const rpwm = sim.gpio.pwm[rpwmPin] || 0;
+        const lpwm = sim.gpio.pwm[lpwmPin] || 0;
+
+        let dir = 0, netPwm = 0;
+        if (en) {
+          const diff = rpwm - lpwm;
+          if (diff > 2) { dir = 1; netPwm = diff; }
+          else if (diff < -2) { dir = -1; netPwm = Math.abs(diff); }
+        }
+        const duty = netPwm / 255;
+        const rpm = Math.round(duty * 540 * (sim.battery.voltage / 12.4));
+        const ampsPerMotor = dir === 0 ? 0 : (0.3 + Math.pow(duty, 1.35) * 4.8);
+        const targetTemp = 27.5 + (ampsPerMotor * 2) * 2.8;
+        const tempC = prevTemp + (targetTemp - prevTemp) * Math.min(1, dt * 1.4);
+        return { en, rpwm, lpwm, dir, pwm: netPwm, rpm, amps: ampsPerMotor, tempC };
+      }
+
+      const svg = {
+        rxBindLed: document.getElementById('rxBindLed'),
+        rxStatusLabel: document.getElementById('rxStatusLabel'),
+        espPwrLed: document.getElementById('espPwrLed'),
+        espGpio2Led: document.getElementById('espGpio2Led'),
+        svgBattVolt: document.getElementById('svgBattVolt'),
+        svgBattAmp: document.getElementById('svgBattAmp'),
+
+        btsLEnLed: document.getElementById('btsLEnLed'),
+        btsLStateTxt: document.getElementById('btsLStateTxt'),
+        btsLRpwmBar: document.getElementById('btsLRpwmBar'),
+        btsLLpwmBar: document.getElementById('btsLLpwmBar'),
+        btsLDutyTxt: document.getElementById('btsLDutyTxt'),
+        btsLTempTxt: document.getElementById('btsLTempTxt'),
+
+        btsREnLed: document.getElementById('btsREnLed'),
+        btsRStateTxt: document.getElementById('btsRStateTxt'),
+        btsRRpwmBar: document.getElementById('btsRRpwmBar'),
+        btsRLpwmBar: document.getElementById('btsRLpwmBar'),
+        btsRDutyTxt: document.getElementById('btsRDutyTxt'),
+        btsRTempTxt: document.getElementById('btsRTempTxt'),
+
+        rotorFL: document.getElementById('rotorFL'),
+        rotorRL: document.getElementById('rotorRL'),
+        rotorFR: document.getElementById('rotorFR'),
+        rotorRR: document.getElementById('rotorRR'),
+
+        mFL: ['mFLDir','mFLPwm','mFLRpm','mFLAmp'].map(id => document.getElementById(id)),
+        mRL: ['mRLDir','mRLPwm','mRLRpm','mRLAmp'].map(id => document.getElementById(id)),
+        mFR: ['mFRDir','mFRPwm','mFRRpm','mFRAmp'].map(id => document.getElementById(id)),
+        mRR: ['mRRDir','mRRPwm','mRRRpm','mRRAmp'].map(id => document.getElementById(id)),
+
+        wires: {
+          ch1: document.getElementById('wire-ch1'), ch2: document.getElementById('wire-ch2'),
+          ch3: document.getElementById('wire-ch3'), ch4: document.getElementById('wire-ch4'),
+          ch5: document.getElementById('wire-ch5'), ch6: document.getElementById('wire-ch6'),
+          lrpwm: document.getElementById('wire-l-rpwm'), llpwm: document.getElementById('wire-l-lpwm'),
+          rrpwm: document.getElementById('wire-r-rpwm'), rlpwm: document.getElementById('wire-r-lpwm'),
+          fla: document.getElementById('wire-fl-a'), rla: document.getElementById('wire-rl-a'),
+          fra: document.getElementById('wire-fr-a'), rra: document.getElementById('wire-rr-a')
+        }
+      };
+
+      function setWireAnim(node, dir, pwm) {
+        if (!node) return;
+        node.classList.remove('wire-flow', 'wire-flow-fast', 'wire-flow-rev');
+        if (dir > 0) node.classList.add(pwm > 180 ? 'wire-flow-fast' : 'wire-flow');
+        else if (dir < 0) node.classList.add('wire-flow-rev');
+      }
+
+      function updateHardwareBoard(dt) {
+        const L = evalBTS7960(25, 26, 14, sim.bts.left.tempC, dt);
+        const R = evalBTS7960(27, 13, 12, sim.bts.right.tempC, dt);
+        Object.assign(sim.bts.left, L);
+        Object.assign(sim.bts.right, R);
+
+        sim.bts.left.angle  = (sim.bts.left.angle  + (L.rpm / 60) * 360 * L.dir * dt) % 360;
+        sim.bts.right.angle = (sim.bts.right.angle + (R.rpm / 60) * 360 * R.dir * dt) % 360;
+
+        const totalA = (sim.running ? 0.34 : 0.14) + L.amps * 2 + R.amps * 2;
+        sim.battery.totalAmps += (totalA - sim.battery.totalAmps) * 0.2;
+        const targetV = Math.max(10.8, sim.battery.nominalV - sim.battery.totalAmps * 0.045);
+        sim.battery.voltage += (targetV - sim.battery.voltage) * 0.16;
+
+        el.hudVoltage.textContent = `${sim.battery.voltage.toFixed(2)}V`;
+        el.hudCurrent.textContent = `${sim.battery.totalAmps.toFixed(2)}A`;
+        svg.svgBattVolt.textContent = `${sim.battery.voltage.toFixed(2)}V`;
+        svg.svgBattAmp.textContent = `${sim.battery.totalAmps.toFixed(2)} A`;
+
+        const fs = sim.rc.failsafe;
+        if (fs) {
+          const blink = Math.floor(performance.now() / 220) % 2 === 0;
+          svg.rxBindLed.setAttribute('fill', blink ? '#ef4444' : '#450a0a');
+          svg.rxStatusLabel.textContent = 'FAILSAFE';
+          svg.rxStatusLabel.setAttribute('fill', '#ef4444');
+        } else {
+          svg.rxBindLed.setAttribute('fill', '#10b981');
+          svg.rxStatusLabel.textContent = 'AFHDS 2A OK';
+          svg.rxStatusLabel.setAttribute('fill', '#10b981');
+        }
+
+        for (let i = 1; i <= 6; i++) {
+          const us = getReceiverPulseUs(`ch${i}`);
+          const pct = us === 0 ? 0 : Math.max(0, Math.min(1, (us - 1000) / 1000));
+          const bar = document.getElementById(`rxBar${i}`);
+          const val = document.getElementById(`rxVal${i}`);
+          if (bar) bar.setAttribute('width', (pct * 58).toFixed(1));
+          if (val) val.textContent = us === 0 ? '0µs!' : `${us}µs`;
+          const wNode = svg.wires[`ch${i}`];
+          if (wNode) {
+            wNode.classList.toggle('wire-flow', !fs && Math.abs(us - 1500) > 35);
+            wNode.setAttribute('opacity', fs ? '0.25' : '0.92');
+          }
+          el[`txCh${i}Val`].textContent = us;
+        }
+
+        svg.espPwrLed.setAttribute('fill', sim.running ? '#ef4444' : '#5f1919');
+        const io2 = sim.running && sim.gpio.digital[2];
+        svg.espGpio2Led.setAttribute('fill', io2 ? '#38bdf8' : '#1e3a5f');
+        svg.espGpio2Led.setAttribute('filter', io2 ? 'url(#glow)' : '');
+
+        [14, 12].forEach(p => {
+          const dot = document.getElementById(`pin-${p}`);
+          if (dot) dot.setAttribute('fill', sim.gpio.digital[p] ? '#a78bfa' : '#334155');
+        });
+        [25, 26, 27, 13].forEach(p => {
+          const dot = document.getElementById(`pin-${p}`);
+          if (dot) dot.setAttribute('fill', (sim.gpio.pwm[p] || 0) > 0 ? '#fbbf24' : '#334155');
+        });
+
+        svg.btsLEnLed.setAttribute('fill', L.en ? '#38bdf8' : '#1e293b');
+        svg.btsLStateTxt.textContent = !L.en ? 'DISABLED' : L.dir > 0 ? 'FWD (RPWM)' : L.dir < 0 ? 'REV (LPWM)' : 'IDLE';
+        svg.btsLStateTxt.setAttribute('fill', L.dir > 0 ? '#38bdf8' : L.dir < 0 ? '#f59e0b' : '#94a3b8');
+        svg.btsLRpwmBar.setAttribute('width', ((L.rpwm / 255) * 72).toFixed(1));
+        svg.btsLLpwmBar.setAttribute('width', ((L.lpwm / 255) * 72).toFixed(1));
+        svg.btsLDutyTxt.textContent = `${Math.round((L.pwm / 255) * 100)}% PWM`;
+        svg.btsLTempTxt.textContent = `${(L.amps * 2).toFixed(1)}A • ${L.tempC.toFixed(0)}°C`;
+
+        svg.btsREnLed.setAttribute('fill', R.en ? '#10b981' : '#1e293b');
+        svg.btsRStateTxt.textContent = !R.en ? 'DISABLED' : R.dir > 0 ? 'FWD (RPWM)' : R.dir < 0 ? 'REV (LPWM)' : 'IDLE';
+        svg.btsRStateTxt.setAttribute('fill', R.dir > 0 ? '#10b981' : R.dir < 0 ? '#fb7185' : '#94a3b8');
+        svg.btsRRpwmBar.setAttribute('width', ((R.rpwm / 255) * 72).toFixed(1));
+        svg.btsRLpwmBar.setAttribute('width', ((R.lpwm / 255) * 72).toFixed(1));
+        svg.btsRDutyTxt.textContent = `${Math.round((R.pwm / 255) * 100)}% PWM`;
+        svg.btsRTempTxt.textContent = `${(R.amps * 2).toFixed(1)}A • ${R.tempC.toFixed(0)}°C`;
+
+        setWireAnim(svg.wires.lrpwm, L.rpwm > 0 && L.en ? 1 : 0, L.rpwm);
+        setWireAnim(svg.wires.llpwm, L.lpwm > 0 && L.en ? 1 : 0, L.lpwm);
+        setWireAnim(svg.wires.rrpwm, R.rpwm > 0 && R.en ? 1 : 0, R.rpwm);
+        setWireAnim(svg.wires.rlpwm, R.lpwm > 0 && R.en ? 1 : 0, R.lpwm);
+        setWireAnim(svg.wires.fla, L.dir, L.pwm);
+        setWireAnim(svg.wires.rla, L.dir, L.pwm);
+        setWireAnim(svg.wires.fra, R.dir, R.pwm);
+        setWireAnim(svg.wires.rra, R.dir, R.pwm);
+
+        svg.rotorFL.setAttribute('transform', `rotate(${sim.bts.left.angle.toFixed(1)})`);
+        svg.rotorRL.setAttribute('transform', `rotate(${sim.bts.left.angle.toFixed(1)})`);
+        svg.rotorFR.setAttribute('transform', `rotate(${sim.bts.right.angle.toFixed(1)})`);
+        svg.rotorRR.setAttribute('transform', `rotate(${sim.bts.right.angle.toFixed(1)})`);
+
+        const lTxt = L.dir > 0 ? 'FWD ▲' : L.dir < 0 ? 'REV ▼' : 'STOP';
+        const lCol = L.dir > 0 ? '#38bdf8' : L.dir < 0 ? '#f59e0b' : '#94a3b8';
+        [svg.mFL, svg.mRL].forEach(([d, p, r, a]) => {
+          d.textContent = lTxt; d.setAttribute('fill', lCol);
+          p.textContent = `PWM: ${L.pwm}/255`;
+          r.textContent = `${L.rpm} RPM`;
+          a.textContent = `${L.amps.toFixed(2)} A`;
+        });
+
+        const rTxt = R.dir > 0 ? 'FWD ▲' : R.dir < 0 ? 'REV ▼' : 'STOP';
+        const rCol = R.dir > 0 ? '#10b981' : R.dir < 0 ? '#fb7185' : '#94a3b8';
+        [svg.mFR, svg.mRR].forEach(([d, p, r, a]) => {
+          d.textContent = rTxt; d.setAttribute('fill', rCol);
+          p.textContent = `PWM: ${R.pwm}/255`;
+          r.textContent = `${R.rpm} RPM`;
+          a.textContent = `${R.amps.toFixed(2)} A`;
+        });
+      }
+
+      /* =====================================================================
+         14. ADAPTIVE 2D PHYSICS SIMULATION ARENA
+         ===================================================================== */
+      const arenaCtx = el.arenaCanvas.getContext('2d');
+
+      function resizeArena() {
+        const r = el.arenaCanvasWrap.getBoundingClientRect();
+        if (r.width > 12 && r.height > 12) {
+          sim.arena.w = r.width;
+          sim.arena.h = r.height;
+          const dpr = Math.min(window.devicePixelRatio || 1, 2);
+          el.arenaCanvas.width = Math.floor(r.width * dpr);
+          el.arenaCanvas.height = Math.floor(r.height * dpr);
+          arenaCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+      }
+
+      function resetArenaScene() {
+        const w = sim.arena.w || 440;
+        const h = sim.arena.h || 190;
+        const startY = sim.editor.vehicle === 'car' ? h * 0.2 : h * 0.5;
+        const startX = sim.editor.vehicle === 'car' ? w * 0.5 : w * 0.28;
+        sim.arena.bot = {
+          x: startX, y: startY, angle: 0, vx: 0, vy: 0, speed: 0,
+          steerAngle: 0, turretAngle: 0, altitude: 120, roll: 0, pitch: 0
+        };
+        sim.arena.ball = { x: w * 0.62, y: h * 0.5, vx: 0, vy: 0 };
+        sim.arena.wake = [];
+        sim.arena.flash = 0;
+        sim.arena.carCheckpoint = false;
+      }
+
+      function stepArenaPhysics(dt) {
+        const vType = sim.editor.vehicle;
+        const w = sim.arena.w, h = sim.arena.h;
+        const bot = sim.arena.bot;
+        const b = sim.arena.ball;
+        const pad = 12;
+
+        const vL = (sim.bts.left.pwm / 255)  * sim.bts.left.dir  * 185;
+        const vR = (sim.bts.right.pwm / 255) * sim.bts.right.dir * 185;
+
+        if (vType === 'soccer' || vType === 'tank') {
+          const lin = (vL + vR) / 2;
+          const ang = (vL - vR) / 34;
+          bot.angle += ang * dt;
+          bot.vx = Math.cos(bot.angle) * lin;
+          bot.vy = Math.sin(bot.angle) * lin;
+          bot.x = Math.max(pad + 16, Math.min(w - pad - 16, bot.x + bot.vx * dt));
+          bot.y = Math.max(pad + 16, Math.min(h - pad - 16, bot.y + bot.vy * dt));
+
+          if (vType === 'tank') {
+            const turPwm = sim.gpio.pwm[23] ?? 128;
+            bot.turretAngle = ((turPwm - 128) / 128) * 1.4;
+            if (Math.hypot(b.x - bot.x, b.y - bot.y) < 26) {
+              sim.arena.score++;
+              if (el.arenaStatVal) el.arenaStatVal.textContent = sim.arena.score;
+              sim.arena.flash = 0.8;
+              b.x = pad + 30 + Math.random() * Math.max(40, w - pad * 2 - 60);
+              b.y = pad + 24 + Math.random() * Math.max(40, h - pad * 2 - 48);
+            }
+          } else {
+            const dx = b.x - bot.x, dy = b.y - bot.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < 26 && dist > 0.01) {
+              const nx = dx / dist, ny = dy / dist;
+              b.x += nx * (26 - dist);
+              b.y += ny * (26 - dist);
+              const kick = Math.max(55, Math.hypot(bot.vx, bot.vy) * 1.45);
+              b.vx = nx * kick + bot.vx * 0.3;
+              b.vy = ny * kick + bot.vy * 0.3;
+            }
+            b.x += b.vx * dt; b.y += b.vy * dt;
+            const fric = Math.pow(0.28, dt);
+            b.vx *= fric; b.vy *= fric;
+            const goalH = Math.max(28, h * 0.24);
+            if (b.x > w - pad - 8 && Math.abs(b.y - h / 2) < goalH) {
+              sim.arena.score++;
+              if (el.arenaStatVal) el.arenaStatVal.textContent = sim.arena.score;
+              sim.arena.flash = 1;
+              showToast('GOAL! RoboSoccer +1', 'success');
+              resetArenaScene();
+              return;
+            }
+            if (b.x < pad + 8) { b.x = pad + 8; b.vx = Math.abs(b.vx) * 0.78; }
+            if (b.x > w - pad - 8) { b.x = w - pad - 8; b.vx = -Math.abs(b.vx) * 0.78; }
+            if (b.y < pad + 8) { b.y = pad + 8; b.vy = Math.abs(b.vy) * 0.78; }
+            if (b.y > h - pad - 8) { b.y = h - pad - 8; b.vy = -Math.abs(b.vy) * 0.78; }
+          }
+        } else if (vType === 'car') {
+          const steerPwm = sim.gpio.pwm[21] ?? 128;
+          bot.steerAngle = ((steerPwm - 128) / 128) * 0.65;
+          const lin = (vL + vR) / 2;
+          bot.speed += (lin - bot.speed) * Math.min(1, dt * 6);
+          bot.angle += (bot.speed / 58) * Math.tan(bot.steerAngle) * dt;
+          const prevX = bot.x;
+          bot.x = Math.max(pad + 16, Math.min(w - pad - 16, bot.x + Math.cos(bot.angle) * bot.speed * dt));
+          bot.y = Math.max(pad + 16, Math.min(h - pad - 16, bot.y + Math.sin(bot.angle) * bot.speed * dt));
+
+          // Simple lap counter around the central island
+          if (bot.y > h * 0.66 && Math.abs(bot.x - w * 0.5) < 40) {
+            sim.arena.carCheckpoint = true;
+          }
+          if (sim.arena.carCheckpoint && bot.y < h * 0.34 && prevX <= w * 0.5 && bot.x > w * 0.5) {
+            sim.arena.carCheckpoint = false;
+            sim.arena.score++;
+            if (el.arenaStatVal) el.arenaStatVal.textContent = sim.arena.score;
+            sim.arena.flash = 0.7;
+            showToast(`Lap ${sim.arena.score} Completed!`, 'success');
+          }
+        } else if (vType === 'airplane') {
+          const ail  = ((sim.gpio.pwm[21] ?? 128) - 128) / 128;
+          const elev = ((sim.gpio.pwm[22] ?? 128) - 128) / 128;
+          const rud  = ((sim.gpio.pwm[23] ?? 128) - 128) / 128;
+          const thrust = Math.max(0, (vL + vR) / 2);
+          bot.roll += (ail * 45 - bot.roll) * Math.min(1, dt * 6);
+          bot.pitch += (elev * 30 - bot.pitch) * Math.min(1, dt * 6);
+          const airspeed = 28 + thrust * 0.95;
+          bot.speed = airspeed;
+          bot.angle += (ail * 1.9 + rud * 1.1) * dt;
+          bot.altitude = Math.max(0, Math.min(1500, bot.altitude + (elev * 95 + (thrust - 60) * 0.25) * dt));
+          bot.x = (bot.x + Math.cos(bot.angle) * airspeed * dt + w) % w;
+          bot.y = (bot.y + Math.sin(bot.angle) * airspeed * dt + h) % h;
+          if (el.arenaStatVal) el.arenaStatVal.textContent = Math.round(bot.altitude);
+        } else if (vType === 'ship') {
+          const rud = ((sim.gpio.pwm[23] ?? 128) - 128) / 128;
+          const thrust = (vL + vR) / 2;
+          const diffYaw = (vL - vR) / 68;
+          bot.speed += (thrust * 0.85 - bot.speed) * Math.min(1, dt * 2.2);
+          bot.angle += (diffYaw + rud * (bot.speed / 90) * 1.3) * dt;
+          bot.x = Math.max(pad + 18, Math.min(w - pad - 18, bot.x + Math.cos(bot.angle) * bot.speed * dt));
+          bot.y = Math.max(pad + 18, Math.min(h - pad - 18, bot.y + Math.sin(bot.angle) * bot.speed * dt));
+          if (Math.abs(bot.speed) > 12) {
+            sim.arena.wake.push({ x: bot.x - Math.cos(bot.angle) * 18, y: bot.y - Math.sin(bot.angle) * 18, life: 1 });
+            if (sim.arena.wake.length > 36) sim.arena.wake.shift();
+          }
+          sim.arena.wake.forEach(p => { p.life -= dt * 0.9; });
+          sim.arena.wake = sim.arena.wake.filter(p => p.life > 0);
+          if (Math.hypot(b.x - bot.x, b.y - bot.y) < 25) {
+            sim.arena.score++;
+            if (el.arenaStatVal) el.arenaStatVal.textContent = sim.arena.score;
+            sim.arena.flash = 0.7;
+            b.x = pad + 35 + Math.random() * Math.max(40, w - pad * 2 - 70);
+            b.y = pad + 26 + Math.random() * Math.max(40, h - pad * 2 - 52);
+          }
+        }
+
+        if (sim.arena.flash > 0) sim.arena.flash = Math.max(0, sim.arena.flash - dt * 1.8);
+      }
+
+      function drawArenaCanvas() {
+        if (el.arenaPanel.classList.contains('hidden')) return;
+        const ctx = arenaCtx;
+        const w = sim.arena.w, h = sim.arena.h;
+        const pad = 12;
+        const vType = sim.editor.vehicle;
+        const bot = sim.arena.bot;
+        const b = sim.arena.ball;
+
+        ctx.clearRect(0, 0, w, h);
+
+        if (vType === 'soccer') {
+          ctx.fillStyle = '#0d2b1b'; ctx.fillRect(0, 0, w, h);
+          const sw = (w - pad * 2) / 8;
+          ctx.fillStyle = '#123823';
+          for (let i = 0; i < 8; i += 2) ctx.fillRect(pad + i * sw, pad, sw, h - pad * 2);
+          ctx.strokeStyle = 'rgba(226,232,240,0.5)'; ctx.lineWidth = 1.8;
+          ctx.strokeRect(pad, pad, w - pad * 2, h - pad * 2);
+          ctx.beginPath(); ctx.moveTo(w / 2, pad); ctx.lineTo(w / 2, h - pad); ctx.stroke();
+          ctx.beginPath(); ctx.arc(w / 2, h / 2, Math.min(w, h) * 0.17, 0, Math.PI * 2); ctx.stroke();
+
+          const gH = Math.max(28, h * 0.24);
+          ctx.fillStyle = 'rgba(56,189,248,0.18)'; ctx.fillRect(2, h / 2 - gH, pad - 2, gH * 2);
+          ctx.fillStyle = 'rgba(245,158,11,0.3)'; ctx.fillRect(w - pad, h / 2 - gH, pad - 2, gH * 2);
+          ctx.strokeStyle = '#fbbf24'; ctx.strokeRect(w - pad, h / 2 - gH, pad - 2, gH * 2);
+
+          ctx.beginPath(); ctx.arc(b.x, b.y, 8, 0, Math.PI * 2);
+          ctx.fillStyle = '#f8fafc'; ctx.fill(); ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 1.5; ctx.stroke();
+          ctx.beginPath(); ctx.arc(b.x, b.y, 2.8, 0, Math.PI * 2); ctx.fillStyle = '#1e293b'; ctx.fill();
+
+          ctx.save(); ctx.translate(bot.x, bot.y); ctx.rotate(bot.angle);
+          if (sim.rc.ch5 > 1600 && !sim.rc.failsafe) {
+            ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.fillStyle = 'rgba(245,158,11,0.18)'; ctx.fill();
+          }
+          ctx.fillStyle = '#0f172a'; ctx.strokeStyle = '#64748b'; ctx.lineWidth = 1;
+          [[-13,-16],[5,-16],[-13,10],[5,10]].forEach(([wx,wy]) => { ctx.fillRect(wx,wy,9,6); ctx.strokeRect(wx,wy,9,6); });
+          ctx.fillStyle = '#1e293b'; ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.roundRect(-15, -12, 30, 24, 5); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#fbbf24'; ctx.fillRect(13, -10, 4.5, 20);
+          ctx.beginPath(); ctx.arc(-2, 0, 3.5, 0, Math.PI * 2);
+          ctx.fillStyle = (sim.running && sim.gpio.digital[2]) ? '#38bdf8' : '#334155'; ctx.fill();
+          ctx.restore();
+        } else if (vType === 'car') {
+          ctx.fillStyle = '#131922'; ctx.fillRect(0, 0, w, h);
+          ctx.strokeStyle = '#334155'; ctx.lineWidth = 2; ctx.strokeRect(pad, pad, w - pad * 2, h - pad * 2);
+
+          // Start/Finish checkered stripe at top middle
+          ctx.strokeStyle = 'rgba(248,250,252,0.5)'; ctx.setLineDash([4, 4]); ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.moveTo(w * 0.5, pad); ctx.lineTo(w * 0.5, h * 0.34); ctx.stroke();
+          ctx.setLineDash([]);
+
+          ctx.fillStyle = '#0e281a';
+          ctx.beginPath(); ctx.roundRect(w * 0.25, h * 0.34, w * 0.5, h * 0.32, 22); ctx.fill();
+          ctx.strokeStyle = '#ef4444'; ctx.setLineDash([8, 8]); ctx.lineWidth = 2.5; ctx.stroke();
+          ctx.setLineDash([]);
+
+          [[w*0.2,h*0.2],[w*0.8,h*0.2],[w*0.2,h*0.8],[w*0.8,h*0.8]].forEach(([cx,cy]) => {
+            ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fillStyle = '#f97316'; ctx.fill();
+          });
+
+          ctx.save(); ctx.translate(bot.x, bot.y); ctx.rotate(bot.angle);
+          ctx.fillStyle = '#090d14'; ctx.fillRect(-14, -13, 9, 4); ctx.fillRect(-14, 9, 9, 4);
+          [[-11],[11]].forEach(([wy]) => {
+            ctx.save(); ctx.translate(10, wy); ctx.rotate(bot.steerAngle);
+            ctx.fillStyle = '#090d14'; ctx.fillRect(-4.5, -2, 9, 4); ctx.restore();
+          });
+          ctx.fillStyle = '#0284c7'; ctx.strokeStyle = '#7dd3fc'; ctx.lineWidth = 1.6;
+          ctx.beginPath(); ctx.roundRect(-16, -9, 32, 18, 6); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#0f172a'; ctx.fillRect(-5, -6.5, 11, 13);
+          ctx.fillStyle = '#fef08a'; ctx.fillRect(14, -7, 2.5, 4); ctx.fillRect(14, 3, 2.5, 4);
+          ctx.restore();
+        } else if (vType === 'tank') {
+          ctx.fillStyle = '#231e16'; ctx.fillRect(0, 0, w, h);
+          ctx.strokeStyle = 'rgba(217,119,6,0.22)'; ctx.lineWidth = 1;
+          for (let x = 0; x < w; x += 32) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+          for (let y = 0; y < h; y += 32) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+
+          ctx.beginPath(); ctx.arc(b.x, b.y, 10, 0, Math.PI * 2); ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2; ctx.stroke();
+          ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI * 2); ctx.fillStyle = '#ef4444'; ctx.fill();
+
+          ctx.save(); ctx.translate(bot.x, bot.y); ctx.rotate(bot.angle);
+          ctx.fillStyle = '#1c1917'; ctx.strokeStyle = '#78716c'; ctx.lineWidth = 1.5;
+          ctx.fillRect(-17, -15, 34, 6); ctx.strokeRect(-17, -15, 34, 6);
+          ctx.fillRect(-17, 9, 34, 6); ctx.strokeRect(-17, 9, 34, 6);
+          ctx.fillStyle = '#4d5c3b'; ctx.strokeStyle = '#84cc16'; ctx.lineWidth = 1.6;
+          ctx.beginPath(); ctx.roundRect(-14, -10, 28, 20, 4); ctx.fill(); ctx.stroke();
+          ctx.rotate(bot.turretAngle);
+          ctx.fillStyle = '#364129'; ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#a3e635'; ctx.fillRect(6, -2, 16, 4);
+          ctx.restore();
+        } else if (vType === 'airplane') {
+          ctx.fillStyle = '#091526'; ctx.fillRect(0, 0, w, h);
+          ctx.fillStyle = '#1e293b'; ctx.fillRect(w * 0.15, h * 0.42, w * 0.7, h * 0.16);
+          ctx.strokeStyle = '#f8fafc'; ctx.setLineDash([10, 10]); ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.moveTo(w * 0.18, h * 0.5); ctx.lineTo(w * 0.82, h * 0.5); ctx.stroke();
+          ctx.setLineDash([]);
+
+          ctx.fillStyle = 'rgba(15,23,42,0.82)'; ctx.fillRect(8, 8, 128, 42);
+          ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 1; ctx.strokeRect(8, 8, 128, 42);
+          ctx.fillStyle = '#7dd3fc'; ctx.font = '10px JetBrains Mono';
+          ctx.fillText(`SPD: ${Math.round(bot.speed)} kt`, 14, 23);
+          ctx.fillText(`ROLL:${Math.round(bot.roll)}° PIT:${Math.round(bot.pitch)}°`, 14, 40);
+
+          ctx.save(); ctx.translate(bot.x, bot.y); ctx.rotate(bot.angle);
+          ctx.fillStyle = '#e2e8f0'; ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.roundRect(-4, -22, 10, 44, 3); ctx.fill(); ctx.stroke();
+          ctx.beginPath(); ctx.roundRect(-18, -3.5, 34, 7, 3); ctx.fill(); ctx.stroke();
+          ctx.fillRect(-18, -9, 5, 18);
+          if (sim.bts.left.pwm > 15) {
+            ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 2.5;
+            ctx.beginPath(); ctx.moveTo(17, -9); ctx.lineTo(17, 9); ctx.stroke();
+          }
+          ctx.restore();
+        } else if (vType === 'ship') {
+          ctx.fillStyle = '#07223a'; ctx.fillRect(0, 0, w, h);
+          ctx.strokeStyle = 'rgba(56,189,248,0.14)'; ctx.lineWidth = 1;
+          for (let y = 18; y < h; y += 22) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+          }
+          // Wake Trail
+          sim.arena.wake.forEach(p => {
+            ctx.beginPath(); ctx.arc(p.x, p.y, 4 + (1 - p.life) * 7, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(186, 230, 253, ${(p.life * 0.35).toFixed(2)})`;
+            ctx.fill();
+          });
+
+          // Target Buoy
+          ctx.beginPath(); ctx.arc(b.x, b.y, 9, 0, Math.PI * 2);
+          ctx.fillStyle = '#f97316'; ctx.fill();
+          ctx.strokeStyle = '#fef3c7'; ctx.lineWidth = 2; ctx.stroke();
+          ctx.beginPath(); ctx.arc(b.x, b.y, 3, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff'; ctx.fill();
+
+          // Twin-Screw RC Ship Sprite
+          const rudAngle = (((sim.gpio.pwm[23] ?? 128) - 128) / 128) * 0.65;
+          ctx.save(); ctx.translate(bot.x, bot.y); ctx.rotate(bot.angle);
+          // Rudder blade at stern
+          ctx.save(); ctx.translate(-18, 0); ctx.rotate(-rudAngle);
+          ctx.fillStyle = '#fbbf24'; ctx.fillRect(-6, -1.5, 6, 3);
+          ctx.restore();
+
+          // Boat hull (pointed bow)
+          ctx.fillStyle = '#1e293b'; ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 1.8;
+          ctx.beginPath();
+          ctx.moveTo(22, 0);
+          ctx.quadraticCurveTo(12, -11, -16, -10);
+          ctx.lineTo(-18, 10);
+          ctx.quadraticCurveTo(12, 11, 22, 0);
+          ctx.closePath();
+          ctx.fill(); ctx.stroke();
+
+          // Bridge / Superstructure
+          ctx.fillStyle = '#e2e8f0';
+          ctx.beginPath(); ctx.roundRect(-8, -5.5, 13, 11, 2.5); ctx.fill();
+          ctx.fillStyle = '#0ea5e9'; ctx.fillRect(0, -4, 3.5, 8);
+
+          // Nav LED
+          ctx.beginPath(); ctx.arc(13, 0, 2.2, 0, Math.PI * 2);
+          ctx.fillStyle = (sim.running && sim.gpio.digital[2]) ? '#10b981' : '#475569';
+          ctx.fill();
+          ctx.restore();
+        }
+
+        if (sim.arena.flash > 0) {
+          ctx.fillStyle = `rgba(16, 185, 129, ${(sim.arena.flash * 0.25).toFixed(2)})`;
+          ctx.fillRect(0, 0, w, h);
+        }
+      }
+
+      /* =====================================================================
+         15. VIEW SWITCHERS, TABS, MODALS, SERIAL & TOOLBAR EVENTS
+         ===================================================================== */
+      function setPreviewView(mode) {
+        const activeCls   = 'px-2.5 py-1 rounded-md text-xs font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/40 cursor-pointer transition';
+        const inactiveCls = 'px-2.5 py-1 rounded-md text-xs font-medium text-slate-400 hover:text-slate-200 border border-transparent cursor-pointer transition';
+
+        el.viewTabCircuit.className = mode === 'circuit' ? activeCls : inactiveCls;
+        el.viewTabArena.className   = mode === 'arena'   ? activeCls : inactiveCls;
+        el.viewTabSplit.className   = mode === 'split'   ? activeCls : inactiveCls;
+
+        if (mode === 'circuit') {
+          el.circuitPanel.classList.remove('hidden');
+          el.arenaPanel.classList.add('hidden');
+        } else if (mode === 'arena') {
+          el.circuitPanel.classList.add('hidden');
+          el.arenaPanel.classList.remove('hidden');
+        } else {
+          el.circuitPanel.classList.remove('hidden');
+          el.arenaPanel.classList.remove('hidden');
+        }
+        requestAnimationFrame(() => { resizeArena(); resizeScope(); });
+      }
+
+      el.viewTabCircuit.addEventListener('click', () => setPreviewView('circuit'));
+      el.viewTabArena.addEventListener('click',   () => setPreviewView('arena'));
+      el.viewTabSplit.addEventListener('click',   () => setPreviewView('split'));
+
+      // Editor File Tabs (sketch.ino vs diagram.json)
+      function setEditorTab(tab) {
+        const on  = 'px-2.5 py-1.5 rounded-t-lg text-xs font-mono font-semibold bg-nordic-bg text-sky-400 border-t border-x border-nordic-border flex items-center gap-1.5 cursor-pointer';
+        const off = 'px-2.5 py-1.5 rounded-t-lg text-xs font-mono font-medium text-slate-400 hover:text-slate-200 border-t border-x border-transparent flex items-center gap-1.5 cursor-pointer';
+        if (tab === 'sketch') {
+          el.tabSketch.className = on;
+          el.tabDiagram.className = off;
+          el.sketchEditorContainer.classList.remove('hidden');
+          el.diagramJsonContainer.classList.add('hidden');
+        } else {
+          el.tabSketch.className = off;
+          el.tabDiagram.className = on;
+          el.sketchEditorContainer.classList.add('hidden');
+          el.diagramJsonContainer.classList.remove('hidden');
+        }
+      }
+
+      el.tabSketch.addEventListener('click',  () => setEditorTab('sketch'));
+      el.tabDiagram.addEventListener('click', () => setEditorTab('diagram'));
+
+      // Simulation Toolbar Controls
+      el.btnCompileRun.addEventListener('click', () => {
+        if (compileAndRunSketch()) showToast('Compiled & running on virtual ESP32!', 'success');
+      });
+
+      el.btnStop.addEventListener('click', () => {
+        stopSimulation();
+        showToast('ESP32 simulation stopped', 'info');
+      });
+
+      el.btnReset.addEventListener('click', () => {
+        sim.arena.score = 0;
+        if (el.arenaStatVal) el.arenaStatVal.textContent = '0';
+        resetArenaScene();
+        clearSerialConsole();
+        compileAndRunSketch();
+        showToast('ESP32 & 2D Arena reset', 'info');
+      });
+
+      el.btnResetArena.addEventListener('click', () => {
+        resetArenaScene();
+        showToast('2D Arena scene reset', 'info');
+      });
+
+      // Preset / Saved Sketch Selector
+      el.presetSelect.addEventListener('change', () => {
+        const v = el.presetSelect.value;
+        if (v.startsWith('preset:')) loadBuiltInPreset(v.slice(7));
+        else if (v.startsWith('saved:')) loadSavedSketchById(v.slice(6));
+      });
+
+      // Customize Modal
+      function openCustomizeModal() { el.customizeModal.classList.remove('hidden'); }
+      function closeCustomizeModal() { el.customizeModal.classList.add('hidden'); }
+
+      el.btnCustomize.addEventListener('click', openCustomizeModal);
+      el.btnBannerCustomize.addEventListener('click', openCustomizeModal);
+      el.closeCustomizeModal.addEventListener('click', closeCustomizeModal);
+      el.customizeModal.addEventListener('click', (e) => {
+        if (e.target === el.customizeModal) closeCustomizeModal();
+      });
+
+      el.btnCloneCurrent.addEventListener('click', () => {
+        const baseTitle = sim.editor.title.replace(/\s*\(Custom\)$/, '');
+        sim.editor.mode = 'custom_unsaved';
+        sim.editor.presetKey = null;
+        sim.editor.savedId = null;
+        sim.editor.title = `${baseTitle} (Custom)`;
+        sim.editor.readOnly = false;
+        sim.editor.dirty = true;
+        updateEditorModeUI();
+        closeCustomizeModal();
+        setEditorTab('sketch');
+        el.codeInput.focus();
+        showToast('Cloned to Custom Editable Mode!', 'success');
+      });
+
+      el.btnNewBlank.addEventListener('click', () => {
+        closeCustomizeModal();
+        loadBuiltInPreset('custom_blank');
+        setEditorTab('sketch');
+        el.codeInput.focus();
+        showToast('Loaded blank ESP32 + BTS7960 template', 'info');
+      });
+
+      // Save Sketch Modal & localStorage Persistence
+      function openSaveModal() {
+        const suggested = sim.editor.readOnly
+          ? `${sim.editor.title} Copy`
+          : sim.editor.title.replace(/\s*\(Custom\)$/, '');
+        el.saveSketchNameInput.value = suggested.slice(0, 42);
+        el.saveVehicleModeSelect.value = sim.editor.vehicle || 'soccer';
+        el.saveModal.classList.remove('hidden');
+        setTimeout(() => el.saveSketchNameInput.focus(), 30);
+      }
+
+      function closeSaveModal() { el.saveModal.classList.add('hidden'); }
+
+      el.btnSaveSketch.addEventListener('click', () => {
+        if (sim.editor.mode === 'saved' && sim.editor.savedId) {
+          const list = loadSavedSketches();
+          const idx = list.findIndex(s => s.id === sim.editor.savedId);
+          if (idx !== -1) {
+            list[idx].code = el.codeInput.value;
+            list[idx].vehicle = sim.editor.vehicle;
+            list[idx].updatedAt = Date.now();
+            persistSavedSketches(list);
+            sim.editor.dirty = false;
+            updateEditorModeUI();
+            showToast(`Saved changes to "${list[idx].name}"`, 'success');
+            return;
+          }
+        }
+        openSaveModal();
+      });
+
+      el.closeSaveModal.addEventListener('click', closeSaveModal);
+      el.cancelSaveBtn.addEventListener('click', closeSaveModal);
+      el.saveModal.addEventListener('click', (e) => {
+        if (e.target === el.saveModal) closeSaveModal();
+      });
+
+      el.saveForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = el.saveSketchNameInput.value.trim();
+        if (!name) return;
+        const vehicle = el.saveVehicleModeSelect.value || 'soccer';
+        const list = loadSavedSketches();
+        const id = 'sk_' + Date.now();
+        list.unshift({ id, name, vehicle, code: el.codeInput.value, updatedAt: Date.now() });
+        persistSavedSketches(list);
+        refreshSavedDropdown();
+
+        sim.editor = {
+          mode: 'saved',
+          presetKey: null,
+          savedId: id,
+          title: name,
+          vehicle,
+          readOnly: false,
+          dirty: false
+        };
+        el.presetSelect.value = `saved:${id}`;
+        applyVehicleTheme(vehicle, vehicle === 'airplane');
+        updateEditorModeUI();
+        closeSaveModal();
+        showToast(`Saved "${name}" to local library`, 'success');
+      });
+
+      // Delete Saved Sketch Modal
+      function closeDeleteModal() { el.deleteModal.classList.add('hidden'); }
+
+      el.btnBannerDelete.addEventListener('click', () => {
+        if (sim.editor.mode !== 'saved' || !sim.editor.savedId) return;
+        el.deleteModalMsg.textContent = `Are you sure you want to permanently delete "${sim.editor.title}" from your local sketch library?`;
+        el.deleteModal.classList.remove('hidden');
+      });
+
+      el.cancelDeleteBtn.addEventListener('click', closeDeleteModal);
+      el.deleteModal.addEventListener('click', (e) => {
+        if (e.target === el.deleteModal) closeDeleteModal();
+      });
+
+      el.confirmDeleteBtn.addEventListener('click', () => {
+        const targetId = sim.editor.savedId;
+        const targetTitle = sim.editor.title;
+        const list = loadSavedSketches().filter(s => s.id !== targetId);
+        persistSavedSketches(list);
+        refreshSavedDropdown();
+        closeDeleteModal();
+        loadBuiltInPreset('robosoccer_arcade');
+        showToast(`Deleted "${targetTitle}"`, 'info');
+      });
+
+      // Export & Copy Buttons
+      el.btnExportIno.addEventListener('click', () => {
+        const slug = sim.editor.title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'sketch';
+        downloadFile(`${slug}.ino`, el.codeInput.value, 'text/plain;charset=utf-8');
+        showToast(`Exported ${slug}.ino`, 'success');
+      });
+
+      el.btnExportDiagram.addEventListener('click', () => {
+        downloadFile('diagram.json', el.diagramJsonPre.textContent, 'application/json;charset=utf-8');
+        showToast('Exported Wokwi diagram.json', 'success');
+      });
+
+      el.btnCopyCode.addEventListener('click', () => copyToClipboard(el.codeInput.value, 'sketch.ino'));
+      el.btnCopyDiagram.addEventListener('click', () => copyToClipboard(el.diagramJsonPre.textContent, 'diagram.json'));
+
+      // Arduino IDE Quick-Toolbar Handlers
+      el.btnIdeVerify.addEventListener('click', () => {
+        if (compileAndRunSketch()) showToast('Verified & uploaded to virtual ESP32!', 'success');
+      });
+
+      el.btnIdeFormat.addEventListener('click', () => {
+        if (sim.editor.readOnly) return;
+        const lines = el.codeInput.value.split('\n');
+        let indent = 0;
+        const formatted = lines.map(raw => {
+          const t = raw.trim();
+          if (!t) return '';
+          if (t.startsWith('}') || t.startsWith('case ') || t.startsWith('default:')) {
+            indent = Math.max(0, indent - 1);
+          }
+          const out = '  '.repeat(indent) + t;
+          const opens = (t.match(/\{/g) || []).length;
+          const closes = (t.match(/\}/g) || []).length;
+          indent = Math.max(0, indent + opens - closes + (t.startsWith('}') ? 1 : 0));
+          return out;
+        }).join('\n');
+        el.codeInput.value = formatted;
+        sim.editor.dirty = true;
+        syncEditorVisuals();
+        updateEditorModeUI();
+        showToast('Auto-formatted Arduino C++ sketch', 'info');
+      });
+
+      el.btnIdeInsertPins.addEventListener('click', () => {
+        if (sim.editor.readOnly) return;
+        const snippet = `// ESP32 + FlySky FS-i6S + Dual BTS7960 Pinout\n#define CH1_PIN 34\n#define CH2_PIN 35\n#define L_RPWM 25\n#define L_LPWM 26\n#define L_EN   14\n#define R_RPWM 27\n#define R_LPWM 13\n#define R_EN   12\n`;
+        const pos = el.codeInput.selectionStart || 0;
+        const v = el.codeInput.value;
+        el.codeInput.value = v.slice(0, pos) + snippet + v.slice(pos);
+        el.codeInput.selectionStart = el.codeInput.selectionEnd = pos + snippet.length;
+        sim.editor.dirty = true;
+        syncEditorVisuals();
+        updateCursorPos();
+        updateEditorModeUI();
+        el.codeInput.focus();
+        showToast('Inserted ESP32 + BTS7960 pinout defines', 'info');
+      });
+
+      // Serial Monitor Events
+      el.btnClearSerial.addEventListener('click', clearSerialConsole);
+      el.baudSelect.addEventListener('change', () => {
+        sim.baudRate = Number(el.baudSelect.value) || 115200;
+        appendSerialLine(`--- Serial Baud set to ${sim.baudRate} ---`, 'system');
+      });
+
+      el.serialForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const cmd = el.serialInput.value.trim();
+        if (!cmd) return;
+        sim.serialRxQueue.push(cmd);
+        appendSerialLine(`> ${cmd}`, 'tx');
+        flashLed(el.serialRxLed, 'bg-amber-400 led-amber');
+        el.serialInput.value = '';
+      });
+
+      // Hardware Component Hover Tooltips
+      document.querySelectorAll('.hw-tip').forEach(node => {
+        node.addEventListener('mouseenter', (e) => {
+          const tip = node.getAttribute('data-tip');
+          if (!tip) return;
+          el.hwTooltip.textContent = tip;
+          el.hwTooltip.style.display = 'block';
+          positionTooltip(e);
+        });
+        node.addEventListener('mousemove', positionTooltip);
+        node.addEventListener('mouseleave', () => {
+          el.hwTooltip.style.display = 'none';
+        });
+      });
+
+      function positionTooltip(e) {
+        const pad = 14;
+        const rect = el.hwTooltip.getBoundingClientRect();
+        let left = e.clientX + pad;
+        let top = e.clientY + pad;
+        if (left + rect.width > window.innerWidth - 8) left = e.clientX - rect.width - pad;
+        if (top + rect.height > window.innerHeight - 8) top = e.clientY - rect.height - pad;
+        el.hwTooltip.style.left = `${Math.max(8, left)}px`;
+        el.hwTooltip.style.top = `${Math.max(8, top)}px`;
+      }
+
+      /* =====================================================================
+         16. MAIN 60FPS SIMULATION & RENDER LOOP
+         ===================================================================== */
+      let lastFrame = performance.now();
+
+      function tick(now) {
+        const dt = Math.min(0.05, Math.max(0.001, (now - lastFrame) / 1000));
+        lastFrame = now;
+
+        stepKeyboardControl();
+
+        if (sim.running) {
+          const elapsedSec = (now - sim.startTime) / 1000;
+          const mins = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+          const secs = (elapsedSec % 60).toFixed(1).padStart(4, '0');
+          el.simRuntimeClock.textContent = `${mins}:${secs}`;
+
+          if (sim.compiledProgram && now >= sim.delayUntil) {
+            try {
+              sim.compiledProgram.loop();
+            } catch (err) {
+              sim.running = false;
+              setCompileBadge('error', 'Runtime Error');
+              appendSerialLine(`[RUNTIME ERR] ${err.message || err}`, 'error');
+              showToast('ESP32 runtime error — check Serial Monitor', 'error');
+            }
+          }
+        }
+
+        updateHardwareBoard(dt);
+        stepArenaPhysics(dt);
+        drawArenaCanvas();
+        drawPwmScope(dt);
+
+        sim.rafId = requestAnimationFrame(tick);
+      }
+
+      /* =====================================================================
+         17. BOOTSTRAP & INITIALIZATION
+         ===================================================================== */
+      window.addEventListener('resize', () => {
+        resizeArena();
+        resizeScope();
+      });
+
+      function init() {
+        refreshSavedDropdown();
+        updateSwitchUI();
+        setPreviewView('split');
+        resizeArena();
+        resizeScope();
+        loadBuiltInPreset('robosoccer_arcade');
+        if (sim.rafId) cancelAnimationFrame(sim.rafId);
+        lastFrame = performance.now();
+        sim.rafId = requestAnimationFrame(tick);
+      }
+
+      if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
+  </script>
+</body>
+</html>
