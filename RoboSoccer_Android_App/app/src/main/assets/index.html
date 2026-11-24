@@ -5,9 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RoboSoccer &amp; RC Wokwi Lab — ESP32 + BTS7960 + FlySky FS-i6S Simulator</title>
 
-  <link rel="stylesheet" href="tailwind.local.css" />
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 
-
+  <!-- Optional Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
   <script>
     if (typeof tailwind !== "undefined") tailwind.config = {
@@ -299,9 +303,9 @@
     <div class="flex flex-wrap items-center gap-1.5">
       <!-- Simulation Controls -->
       <div class="flex items-center bg-nordic-bg border border-nordic-border rounded-lg p-0.5 gap-0.5">
-        <button id="btnCompileRun" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white transition shadow-sm cursor-pointer">
+        <button id="btnCompileRun" title="Runs the virtual ESP32 simulation only; no firmware is uploaded to a physical board." class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white transition shadow-sm cursor-pointer">
           <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 16 16"><path d="M4 2.5v11l9-5.5-9-5.5z"/></svg>
-          <span>Compile &amp; Run</span>
+          <span>Run Simulation</span>
         </button>
         <button id="btnStop" class="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-red-600/20 hover:bg-red-600/35 text-red-300 border border-red-500/30 transition cursor-pointer" title="Stop Simulation">
           <svg class="w-3 h-3 fill-current" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" rx="1.5"/></svg>
@@ -335,10 +339,19 @@
         <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
         <span>Customize</span>
       </button>
+      <button id="btnChannelMixer" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500/15 border border-amber-500/35 text-amber-200 hover:bg-amber-500/25">CH Mixer</button>
+      <button id="btnBoardManager" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-nordic-elevated border border-nordic-border text-slate-200 hover:border-sky-500/60">Boards</button>
+      <button id="btnLibraryManager" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-nordic-elevated border border-nordic-border text-slate-200 hover:border-sky-500/60">Libraries</button>
     </div>
 
     <!-- Right Action Buttons: Save Sketch, Export .ino, Export diagram.json -->
-    <div class="flex items-center gap-1.5">
+    <div class="flex items-center gap-1.5 flex-wrap">
+      <div id="usbStatusPill" class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-[10px] font-mono">
+        <span id="usbStatusDot" class="w-2 h-2 rounded-full bg-red-400"></span>
+        <span id="usbStatusText">ESP32: Not connected</span>
+      </div>
+      <button id="btnConnectUsb" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-sky-600/20 border border-sky-500/40 text-sky-200">USB Connect</button>
+      <button id="btnUploadEsp32" disabled title="Connect a supported USB serial board first" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600/10 border border-emerald-500/25 text-emerald-300 opacity-50 cursor-not-allowed">Upload ESP32</button>
       <button id="btnSaveSketch" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-sky-600/25 hover:bg-sky-600/40 border border-sky-500/45 text-sky-200 transition cursor-pointer" title="Save current sketch to localStorage">
         <svg class="w-3.5 h-3.5 text-sky-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         <span>Save As...</span>
@@ -1058,6 +1071,58 @@
         <button id="cancelDeleteBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-nordic-elevated hover:bg-nordic-hover text-slate-300 cursor-pointer">Cancel</button>
         <button id="confirmDeleteBtn" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-red-600 hover:bg-red-500 text-white cursor-pointer">Delete</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Channel Mixer -->
+  <div id="channelMixerModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3">
+    <div class="bg-nordic-panel border border-amber-500/40 rounded-2xl max-w-xl w-full p-4 shadow-2xl max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-2"><h2 class="text-base font-bold text-white">RC Channel Mixer</h2><button id="closeChannelMixer" class="text-slate-400 hover:text-white text-xl">&times;</button></div>
+      <p class="text-[11px] text-slate-400 mb-3">Mixes virtual FS-i6S receiver channels before they reach the ESP32 simulator. Example: CH2 − CH3 creates a differential output on CH2.</p>
+      <label class="flex items-center gap-2 mb-3 text-xs text-slate-200"><input id="mixEnabled" type="checkbox" class="accent-amber-400"> Enable channel mix</label>
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        <label class="text-slate-400">Output channel<select id="mixTarget" class="block w-full mt-1 bg-nordic-bg border border-nordic-border rounded-lg p-2 text-slate-100"><option value="ch1">CH1</option><option value="ch2">CH2</option><option value="ch3">CH3</option><option value="ch4">CH4</option><option value="ch5">CH5</option><option value="ch6">CH6</option></select></label>
+        <label class="text-slate-400">Operation<select id="mixOperation" class="block w-full mt-1 bg-nordic-bg border border-nordic-border rounded-lg p-2 text-slate-100"><option value="add">A + B</option><option value="subtract">A − B</option></select></label>
+        <label class="text-slate-400">Source A<select id="mixSourceA" class="block w-full mt-1 bg-nordic-bg border border-nordic-border rounded-lg p-2 text-slate-100"><option value="ch1">CH1</option><option value="ch2" selected>CH2</option><option value="ch3">CH3</option><option value="ch4">CH4</option><option value="ch5">CH5</option><option value="ch6">CH6</option></select></label>
+        <label class="text-slate-400">Source B<select id="mixSourceB" class="block w-full mt-1 bg-nordic-bg border border-nordic-border rounded-lg p-2 text-slate-100"><option value="ch1">CH1</option><option value="ch2">CH2</option><option value="ch3" selected>CH3</option><option value="ch4">CH4</option><option value="ch5">CH5</option><option value="ch6">CH6</option></select></label>
+      </div>
+      <div class="grid grid-cols-2 gap-3 mt-3 text-xs">
+        <label class="text-slate-400">Source A weight <span id="mixWeightAValue" class="text-sky-300">100%</span><input id="mixWeightA" class="w-full mt-2 accent-sky-400" type="range" min="0" max="200" value="100"></label>
+        <label class="text-slate-400">Source B weight <span id="mixWeightBValue" class="text-sky-300">100%</span><input id="mixWeightB" class="w-full mt-2 accent-sky-400" type="range" min="0" max="200" value="100"></label>
+      </div>
+      <div class="mt-3 rounded-lg bg-nordic-bg border border-nordic-border p-3"><div class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Live mixed output</div><div class="flex items-end justify-between gap-2"><div><div id="mixPreviewLabel" class="text-sm font-bold text-amber-300">CH2 = CH2 − CH3</div><div class="text-[10px] text-slate-500">Clamped to 1000–2000 µs</div></div><div id="mixPreviewValue" class="text-2xl font-mono font-bold text-white">1500 µs</div></div></div>
+      <div class="flex justify-end gap-2 mt-4"><button id="resetChannelMixer" class="px-3 py-2 rounded-lg text-xs bg-nordic-elevated border border-nordic-border text-slate-300">Reset</button><button id="saveChannelMixer" class="px-4 py-2 rounded-lg text-xs font-bold bg-amber-500 text-slate-950">Apply Mixer</button></div>
+    </div>
+  </div>
+
+  <!-- USB Device Picker -->
+  <div id="usbModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3">
+    <div class="bg-nordic-panel border border-sky-500/40 rounded-2xl max-w-xl w-full p-4 shadow-2xl">
+      <div class="flex items-center justify-between mb-2"><h2 class="text-base font-bold text-white">USB / ESP32 Connection</h2><button id="closeUsbModal" class="text-slate-400 text-xl">&times;</button></div>
+      <p class="text-[11px] text-slate-400 mb-3">Connect the ESP32 with a data-capable USB OTG cable. Android will request USB permission. CP210x, CH340, FTDI and USB CDC serial adapters are supported.</p>
+      <div class="flex gap-2 mb-3"><button id="scanUsbNow" class="px-3 py-2 rounded-lg text-xs bg-sky-600 text-white">Scan USB devices</button><button id="disconnectUsb" class="px-3 py-2 rounded-lg text-xs bg-red-500/15 border border-red-500/30 text-red-200">Disconnect</button></div>
+      <div id="usbDeviceList" class="space-y-2 text-xs"><div class="text-slate-500">No scan yet.</div></div>
+      <div class="mt-3 text-[10px] text-amber-200/80">A detected USB serial adapter is not proof of the ESP32 chip itself. Confirm the connected board in the board settings. This app's current USB feature provides real port detection and serial communication; firmware flashing is not included in this build.</div>
+    </div>
+  </div>
+
+  <!-- Board Manager -->
+  <div id="boardManagerModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3">
+    <div class="bg-nordic-panel border border-sky-500/40 rounded-2xl max-w-2xl w-full p-4 shadow-2xl max-h-[92vh] flex flex-col">
+      <div class="flex items-center justify-between mb-2"><h2 class="text-base font-bold text-white">Board Manager</h2><button id="closeBoardManager" class="text-slate-400 text-xl">&times;</button></div>
+      <p class="text-[10px] text-slate-400 mb-2">Live vendor indexes. Board archives can be downloaded into this app's private package cache. Android-native compile/upload toolchains are not yet bundled, so downloaded cores are not marked as compile-ready.</p>
+      <div class="flex flex-wrap gap-2 mb-2"><select id="boardIndexSelect" class="bg-nordic-bg border border-nordic-border rounded-lg p-2 text-xs text-slate-100"><option value="esp32">Espressif ESP32</option><option value="arduino">Arduino official</option></select><input id="boardSearch" placeholder="Search board / architecture" class="flex-1 min-w-[120px] bg-nordic-bg border border-nordic-border rounded-lg p-2 text-xs text-white"><button id="refreshBoards" class="px-3 py-2 rounded-lg bg-sky-600 text-white text-xs">Sync index</button></div>
+      <div id="boardManagerStatus" class="text-[10px] text-slate-500 mb-2">Not synced.</div><div id="boardCatalogList" class="overflow-y-auto space-y-2 flex-1 text-xs"><div class="text-slate-500">Tap Sync index to load available platforms.</div></div>
+    </div>
+  </div>
+
+  <!-- Library Manager -->
+  <div id="libraryManagerModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3">
+    <div class="bg-nordic-panel border border-emerald-500/40 rounded-2xl max-w-2xl w-full p-4 shadow-2xl max-h-[92vh] flex flex-col">
+      <div class="flex items-center justify-between mb-2"><h2 class="text-base font-bold text-white">Library Manager</h2><button id="closeLibraryManager" class="text-slate-400 text-xl">&times;</button></div>
+      <p class="text-[10px] text-slate-400 mb-2">Synchronizes Arduino's online library index and installs ZIP libraries into this app's private library folder. Library dependencies are not automatically resolved yet.</p>
+      <div class="flex gap-2 mb-2"><input id="librarySearch" placeholder="Search libraries (e.g. Servo, ESP32Servo)" class="flex-1 min-w-0 bg-nordic-bg border border-nordic-border rounded-lg p-2 text-xs text-white"><button id="refreshLibraries" class="px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs">Sync libraries</button></div>
+      <div id="libraryManagerStatus" class="text-[10px] text-slate-500 mb-2">Not synced.</div><div id="libraryCatalogList" class="overflow-y-auto space-y-2 flex-1 text-xs"><div class="text-slate-500">Tap Sync libraries to load the online index.</div></div>
     </div>
   </div>
 
@@ -1872,6 +1937,15 @@ void loop() {
       };
 
       const RX_PIN_MAP = { 34: 'ch1', 35: 'ch2', 32: 'ch3', 33: 'ch4', 18: 'ch5', 19: 'ch6' };
+      const MIX_STORAGE_KEY = 'robosoccer_channel_mix_v1';
+      const defaultChannelMix = { enabled: false, target: 'ch2', sourceA: 'ch2', sourceB: 'ch3', operation: 'subtract', weightA: 100, weightB: 100 };
+      let channelMixConfig = (() => {
+        try { return { ...defaultChannelMix, ...(JSON.parse(localStorage.getItem(MIX_STORAGE_KEY) || '{}')) }; }
+        catch (_) { return { ...defaultChannelMix }; }
+      })();
+      const usbState = { connected: false, devices: [], activeDevice: null };
+      const packageState = { boards: [], libraries: [], boardSynced: false, librarySynced: false, installedLibraries: [] };
+      try { packageState.installedLibraries = JSON.parse(localStorage.getItem('robosoccer_installed_libraries_v1') || '[]'); } catch (_) {}
 
       /* =====================================================================
          5. DOM ELEMENT REFERENCES
@@ -1883,6 +1957,47 @@ void loop() {
         presetSelect: document.getElementById('presetSelect'),
         savedSketchesGroup: document.getElementById('savedSketchesGroup'),
         btnCustomize: document.getElementById('btnCustomize'),
+        btnChannelMixer: document.getElementById('btnChannelMixer'),
+        btnBoardManager: document.getElementById('btnBoardManager'),
+        btnLibraryManager: document.getElementById('btnLibraryManager'),
+        btnConnectUsb: document.getElementById('btnConnectUsb'),
+        btnUploadEsp32: document.getElementById('btnUploadEsp32'),
+        usbStatusPill: document.getElementById('usbStatusPill'),
+        usbStatusDot: document.getElementById('usbStatusDot'),
+        usbStatusText: document.getElementById('usbStatusText'),
+        channelMixerModal: document.getElementById('channelMixerModal'),
+        closeChannelMixer: document.getElementById('closeChannelMixer'),
+        mixEnabled: document.getElementById('mixEnabled'),
+        mixTarget: document.getElementById('mixTarget'),
+        mixOperation: document.getElementById('mixOperation'),
+        mixSourceA: document.getElementById('mixSourceA'),
+        mixSourceB: document.getElementById('mixSourceB'),
+        mixWeightA: document.getElementById('mixWeightA'),
+        mixWeightB: document.getElementById('mixWeightB'),
+        mixWeightAValue: document.getElementById('mixWeightAValue'),
+        mixWeightBValue: document.getElementById('mixWeightBValue'),
+        mixPreviewLabel: document.getElementById('mixPreviewLabel'),
+        mixPreviewValue: document.getElementById('mixPreviewValue'),
+        saveChannelMixer: document.getElementById('saveChannelMixer'),
+        resetChannelMixer: document.getElementById('resetChannelMixer'),
+        usbModal: document.getElementById('usbModal'),
+        closeUsbModal: document.getElementById('closeUsbModal'),
+        scanUsbNow: document.getElementById('scanUsbNow'),
+        disconnectUsb: document.getElementById('disconnectUsb'),
+        usbDeviceList: document.getElementById('usbDeviceList'),
+        boardManagerModal: document.getElementById('boardManagerModal'),
+        closeBoardManager: document.getElementById('closeBoardManager'),
+        boardIndexSelect: document.getElementById('boardIndexSelect'),
+        boardSearch: document.getElementById('boardSearch'),
+        refreshBoards: document.getElementById('refreshBoards'),
+        boardManagerStatus: document.getElementById('boardManagerStatus'),
+        boardCatalogList: document.getElementById('boardCatalogList'),
+        libraryManagerModal: document.getElementById('libraryManagerModal'),
+        closeLibraryManager: document.getElementById('closeLibraryManager'),
+        librarySearch: document.getElementById('librarySearch'),
+        refreshLibraries: document.getElementById('refreshLibraries'),
+        libraryManagerStatus: document.getElementById('libraryManagerStatus'),
+        libraryCatalogList: document.getElementById('libraryCatalogList'),
         btnSaveSketch: document.getElementById('btnSaveSketch'),
         btnExportIno: document.getElementById('btnExportIno'),
         btnExportDiagram: document.getElementById('btnExportDiagram'),
@@ -2021,10 +2136,6 @@ void loop() {
       }
 
       function copyToClipboard(text, label) {
-        if (window.AndroidBridge && typeof window.AndroidBridge.copyText === 'function') {
-          try { window.AndroidBridge.copyText(text); showToast(`Copied ${label} to clipboard`, 'info'); return; }
-          catch (e) { console.warn('Native clipboard bridge failed', e); }
-        }
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(text)
             .then(() => showToast(`Copied ${label} to clipboard`, 'info'))
@@ -2040,10 +2151,6 @@ void loop() {
       }
 
       function downloadFile(filename, content, mime = 'text/plain') {
-        if (window.AndroidBridge && typeof window.AndroidBridge.saveFile === 'function') {
-          try { window.AndroidBridge.saveFile(filename, content, mime); return; }
-          catch (e) { console.warn('Native file export failed; using browser download', e); }
-        }
         const blob = new Blob([content], { type: mime });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -2584,7 +2691,11 @@ void loop() {
          ===================================================================== */
       function getReceiverPulseUs(chKey) {
         if (sim.rc.failsafe) return 0;
-        return Math.round(sim.rc[chKey] ?? 1500);
+        const raw = (key) => Math.round(Number(sim.rc[key] ?? 1500));
+        if (!channelMixConfig.enabled || channelMixConfig.target !== chKey) return raw(chKey);
+        const a = (raw(channelMixConfig.sourceA) - 1500) * (Number(channelMixConfig.weightA) / 100);
+        const b = (raw(channelMixConfig.sourceB) - 1500) * (Number(channelMixConfig.weightB) / 100);
+        return Math.max(1000, Math.min(2000, Math.round(1500 + a + (channelMixConfig.operation === 'subtract' ? -b : b))));
       }
 
       function setKnobVisual(knobEl, nx, ny) {
@@ -3587,15 +3698,17 @@ void loop() {
       el.baudSelect.addEventListener('change', () => {
         sim.baudRate = Number(el.baudSelect.value) || 115200;
         appendSerialLine(`--- Serial Baud set to ${sim.baudRate} ---`, 'system');
+        if (usbState.connected && window.AndroidBridge) window.AndroidBridge.setSerialBaudRate(sim.baudRate);
       });
 
       el.serialForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const cmd = el.serialInput.value.trim();
         if (!cmd) return;
-        sim.serialRxQueue.push(cmd);
         appendSerialLine(`> ${cmd}`, 'tx');
         flashLed(el.serialRxLed, 'bg-amber-400 led-amber');
+        if (usbState.connected && window.AndroidBridge) window.AndroidBridge.serialWrite(cmd + '\\n');
+        else sim.serialRxQueue.push(cmd);
         el.serialInput.value = '';
       });
 
@@ -3624,6 +3737,134 @@ void loop() {
         el.hwTooltip.style.left = `${Math.max(8, left)}px`;
         el.hwTooltip.style.top = `${Math.max(8, top)}px`;
       }
+
+
+      // RC channel mixer UI and persistent settings
+      function readMixerUi() {
+        return { enabled: el.mixEnabled.checked, target: el.mixTarget.value, sourceA: el.mixSourceA.value, sourceB: el.mixSourceB.value, operation: el.mixOperation.value, weightA: Number(el.mixWeightA.value), weightB: Number(el.mixWeightB.value) };
+      }
+      function updateMixerPreview() {
+        if (!el.mixWeightA) return;
+        const c = readMixerUi();
+        el.mixWeightAValue.textContent = c.weightA + '%';
+        el.mixWeightBValue.textContent = c.weightB + '%';
+        const a = (Number(sim.rc[c.sourceA] || 1500) - 1500) * c.weightA / 100;
+        const b = (Number(sim.rc[c.sourceB] || 1500) - 1500) * c.weightB / 100;
+        const mixed = Math.max(1000, Math.min(2000, Math.round(1500 + a + (c.operation === 'subtract' ? -b : b))));
+        el.mixPreviewLabel.textContent = c.target.toUpperCase() + ' = ' + c.sourceA.toUpperCase() + (c.operation === 'subtract' ? ' − ' : ' + ') + c.sourceB.toUpperCase();
+        el.mixPreviewValue.textContent = mixed + ' µs' + (c.enabled ? '' : ' (mix off)');
+      }
+      function populateMixerUi() {
+        el.mixEnabled.checked = !!channelMixConfig.enabled;
+        el.mixTarget.value = channelMixConfig.target; el.mixSourceA.value = channelMixConfig.sourceA;
+        el.mixSourceB.value = channelMixConfig.sourceB; el.mixOperation.value = channelMixConfig.operation;
+        el.mixWeightA.value = channelMixConfig.weightA; el.mixWeightB.value = channelMixConfig.weightB;
+        updateMixerPreview();
+      }
+      [el.mixEnabled, el.mixTarget, el.mixSourceA, el.mixSourceB, el.mixOperation, el.mixWeightA, el.mixWeightB].forEach(n => { n.addEventListener('input', updateMixerPreview); n.addEventListener('change', updateMixerPreview); });
+      el.btnChannelMixer.addEventListener('click', () => { populateMixerUi(); el.channelMixerModal.classList.remove('hidden'); });
+      el.closeChannelMixer.addEventListener('click', () => el.channelMixerModal.classList.add('hidden'));
+      el.channelMixerModal.addEventListener('click', e => { if (e.target === el.channelMixerModal) el.channelMixerModal.classList.add('hidden'); });
+      el.saveChannelMixer.addEventListener('click', () => {
+        channelMixConfig = readMixerUi();
+        localStorage.setItem(MIX_STORAGE_KEY, JSON.stringify(channelMixConfig));
+        showToast(channelMixConfig.enabled ? 'Channel mix applied to virtual receiver' : 'Channel mix disabled', 'success');
+        el.channelMixerModal.classList.add('hidden');
+      });
+      el.resetChannelMixer.addEventListener('click', () => { channelMixConfig = { ...defaultChannelMix }; localStorage.removeItem(MIX_STORAGE_KEY); populateMixerUi(); showToast('Channel mixer reset', 'info'); });
+
+      // Native Android USB serial and package catalog callbacks
+      function setUsbUi() {
+        const connected = !!usbState.connected;
+        el.usbStatusPill.className = connected ? 'flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/35 text-emerald-300 text-[10px] font-mono' : 'flex items-center gap-1.5 px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-[10px] font-mono';
+        el.usbStatusDot.className = connected ? 'w-2 h-2 rounded-full bg-emerald-400 led-green' : 'w-2 h-2 rounded-full bg-red-400';
+        el.usbStatusText.textContent = connected ? 'USB serial connected' : 'ESP32: Not connected';
+        el.btnUploadEsp32.disabled = !connected;
+        el.btnUploadEsp32.className = connected ? 'px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600/20 border border-emerald-500/45 text-emerald-200' : 'px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600/10 border border-emerald-500/25 text-emerald-300 opacity-50 cursor-not-allowed';
+      }
+      function renderUsbDevices() {
+        if (!usbState.devices.length) { el.usbDeviceList.innerHTML = '<div class="rounded-lg border border-nordic-border bg-nordic-bg p-3 text-slate-400">No supported USB serial adapters detected. Check the OTG/data cable and scan again.</div>'; return; }
+        el.usbDeviceList.innerHTML = usbState.devices.map(d => {
+          const title = String(d.manufacturer || d.product || d.driver || 'USB serial adapter').replace(/[<>]/g, '');
+          const details = 'VID:PID ' + Number(d.vendorId).toString(16).padStart(4,'0') + ':' + Number(d.productId).toString(16).padStart(4,'0') + ' · ' + String(d.driver).replace(/[<>]/g,'');
+          return '<div class="flex items-center justify-between gap-2 rounded-lg border border-nordic-border bg-nordic-bg p-3"><div class="min-w-0"><div class="font-semibold text-slate-100">' + title + '</div><div class="text-[10px] text-slate-500">' + details + '</div></div><button data-usb-device="' + Number(d.deviceId) + '" class="shrink-0 rounded-lg px-3 py-2 bg-sky-600 text-white">Connect</button></div>';
+        }).join('');
+        el.usbDeviceList.querySelectorAll('[data-usb-device]').forEach(b => b.addEventListener('click', () => window.AndroidBridge && window.AndroidBridge.connectUsb(Number(b.getAttribute('data-usb-device')))));
+      }
+      window.RoboSoccerNative = {
+        onUsbScan(p) { usbState.devices = p.devices || []; usbState.connected = !!p.connected; renderUsbDevices(); setUsbUi(); },
+        onUsbConnected(info) { usbState.connected = true; usbState.activeDevice = info; setUsbUi(); showToast('USB serial port opened at 115200 baud', 'success'); appendSerialLine('[USB] Connected: ' + (info.manufacturer || info.product || info.driver || 'USB serial adapter'), 'system'); renderUsbDevices(); },
+        onUsbDisconnected(msg) { usbState.connected = false; usbState.activeDevice = null; setUsbUi(); appendSerialLine('[USB] ' + (msg || 'Disconnected'), 'system'); renderUsbDevices(); },
+        onUsbData(data) { appendSerialLine('[USB RX] ' + String(data).replace(/[\\r\\n]+$/g, ''), 'rx'); },
+        onUsbError(msg) { showToast(msg, 'error'); appendSerialLine('[USB ERROR] ' + msg, 'error'); },
+        onUsbInfo(msg) { appendSerialLine('[USB] ' + msg, 'system'); },
+        onCatalogData(p) {
+          try {
+            const data = JSON.parse(p.data);
+            if (p.kind === 'board') {
+              packageState.boards = (data.packages || []).flatMap(pkg => (pkg.platforms || []).map(v => ({packager:pkg.name,maintainer:pkg.maintainer || pkg.name,name:v.name,architecture:v.architecture,version:v.version,url:v.url})));
+              packageState.boardSynced = true; renderBoardCatalog();
+              el.boardManagerStatus.textContent = 'Synced ' + packageState.boards.length + ' board platform versions.';
+            } else {
+              const grouped = new Map();
+              (data.libraries || []).forEach(v => { const old=grouped.get(v.name); if (!old || String(v.version).localeCompare(String(old.version),undefined,{numeric:true}) > 0) grouped.set(v.name,v); });
+              packageState.libraries = Array.from(grouped.values()).sort((a,b)=>a.name.localeCompare(b.name));
+              packageState.librarySynced = true; renderLibraryCatalog();
+              el.libraryManagerStatus.textContent = 'Synced ' + packageState.libraries.length + ' library entries. Search to filter.';
+            }
+          } catch(e) { (p.kind === 'board' ? el.boardManagerStatus : el.libraryManagerStatus).textContent = 'Index parse failed: ' + e.message; }
+        },
+        onCatalogError(p) { (p.kind === 'board' ? el.boardManagerStatus : el.libraryManagerStatus).textContent = 'Sync failed: ' + p.message; },
+        onLibraryInstalled(info) { if (!packageState.installedLibraries.includes(info.name)) packageState.installedLibraries.push(info.name); localStorage.setItem('robosoccer_installed_libraries_v1', JSON.stringify(packageState.installedLibraries)); showToast('Library saved to app storage: ' + info.name, 'success'); renderLibraryCatalog(); },
+        onLibraryInstallError(msg) { showToast('Library install failed: ' + msg, 'error'); },
+        onBoardArchiveDownloaded(path) { el.boardManagerStatus.textContent = 'Board archive downloaded to private app storage: ' + path; showToast('Board archive downloaded', 'success'); },
+        onBoardArchiveError(msg) { showToast('Board download failed: ' + msg, 'error'); }
+      };
+      function boardIndexUrl() { return el.boardIndexSelect.value === 'esp32' ? 'https://espressif.github.io/arduino-esp32/package_esp32_index.json' : 'https://downloads.arduino.cc/packages/package_index.json'; }
+      function renderBoardCatalog() {
+        const q=el.boardSearch.value.trim().toLowerCase();
+        const rows=packageState.boards.filter(p=>[p.name,p.architecture,p.packager,p.maintainer].join(' ').toLowerCase().includes(q)).slice(0,70);
+        if (!rows.length) { el.boardCatalogList.innerHTML='<div class="text-slate-500 p-3">No matching platforms. Sync the index or adjust the search.</div>'; return; }
+        el.boardCatalogList.innerHTML=rows.map(p=>{
+          const label=(p.packager+':'+p.architecture+'@'+p.version).replace(/[<>]/g,'');
+          const title=String(p.name||p.architecture).replace(/[<>]/g,'');
+          return '<div class="rounded-lg border border-nordic-border bg-nordic-bg p-3 flex items-center justify-between gap-2"><div class="min-w-0"><div class="font-semibold text-slate-100">'+title+'</div><div class="text-[10px] text-slate-500">'+label+'</div></div><button data-board-url="'+encodeURIComponent(p.url||'')+'" data-board-name="'+encodeURIComponent(label)+'" class="shrink-0 px-3 py-2 rounded-lg bg-sky-600/20 border border-sky-500/40 text-sky-200">Download archive</button></div>';
+        }).join('');
+        el.boardCatalogList.querySelectorAll('[data-board-url]').forEach(b=>b.addEventListener('click',()=>window.AndroidBridge&&window.AndroidBridge.downloadBoardArchive(decodeURIComponent(b.dataset.boardName),decodeURIComponent(b.dataset.boardUrl))));
+      }
+      function renderLibraryCatalog() {
+        const q=el.librarySearch.value.trim().toLowerCase();
+        const rows=packageState.libraries.filter(v=>[v.name,v.author,v.sentence,v.paragraph].join(' ').toLowerCase().includes(q)).slice(0,70);
+        if (!rows.length) { el.libraryCatalogList.innerHTML='<div class="text-slate-500 p-3">No matches. Sync libraries first or refine search.</div>'; return; }
+        el.libraryCatalogList.innerHTML=rows.map(v=>{
+          const name=String(v.name||'').replace(/[<>]/g,'');
+          const version=String(v.version||'');
+          const author=String(v.author||'Unknown author').replace(/[<>]/g,'');
+          const installed=packageState.installedLibraries.includes(name);
+          return '<div class="rounded-lg border border-nordic-border bg-nordic-bg p-3 flex items-center justify-between gap-2"><div class="min-w-0"><div class="font-semibold text-slate-100">'+name+' <span class="text-slate-500 font-normal">v'+version+'</span></div><div class="text-[10px] text-slate-500">'+author+'</div></div><button data-library-url="'+encodeURIComponent(v.url||'')+'" data-library-name="'+encodeURIComponent(name)+'" '+(installed?'disabled':'')+' class="shrink-0 px-3 py-2 rounded-lg '+(installed?'bg-emerald-500/10 text-emerald-300':'bg-emerald-600 text-white')+'">'+(installed?'Installed':'Install ZIP')+'</button></div>';
+        }).join('');
+        el.libraryCatalogList.querySelectorAll('[data-library-url]').forEach(b=>b.addEventListener('click',()=>window.AndroidBridge&&window.AndroidBridge.installLibrary(decodeURIComponent(b.dataset.libraryName),decodeURIComponent(b.dataset.libraryUrl))));
+      }
+      function syncBoardIndex() { el.boardManagerStatus.textContent='Syncing vendor board index…'; if(window.AndroidBridge) window.AndroidBridge.fetchCatalog(boardIndexUrl(),'board'); else el.boardManagerStatus.textContent='Native Android bridge unavailable.'; }
+      function syncLibraryIndex() { el.libraryManagerStatus.textContent='Downloading Arduino library index…'; if(window.AndroidBridge) window.AndroidBridge.fetchCatalog('https://downloads.arduino.cc/libraries/library_index.json','library'); else el.libraryManagerStatus.textContent='Native Android bridge unavailable.'; }
+      el.btnConnectUsb.addEventListener('click',()=>{el.usbModal.classList.remove('hidden');renderUsbDevices();if(window.AndroidBridge)window.AndroidBridge.scanUsbDevices();});
+      el.closeUsbModal.addEventListener('click',()=>el.usbModal.classList.add('hidden'));
+      el.scanUsbNow.addEventListener('click',()=>window.AndroidBridge&&window.AndroidBridge.scanUsbDevices());
+      el.disconnectUsb.addEventListener('click',()=>window.AndroidBridge&&window.AndroidBridge.disconnectUsb());
+      el.usbModal.addEventListener('click',e=>{if(e.target===el.usbModal)el.usbModal.classList.add('hidden');});
+      el.btnUploadEsp32.addEventListener('click',()=>{
+        if(!usbState.connected){showToast('Upload blocked: no USB serial board detected', 'error');return;}
+        showToast('USB serial is connected, but Arduino compiler and ESP32 firmware flasher are not packaged. No firmware was uploaded.', 'warn');
+      });
+      el.btnBoardManager.addEventListener('click',()=>{el.boardManagerModal.classList.remove('hidden');if(!packageState.boardSynced)syncBoardIndex();});
+      el.closeBoardManager.addEventListener('click',()=>el.boardManagerModal.classList.add('hidden'));
+      el.refreshBoards.addEventListener('click',syncBoardIndex);
+      el.boardIndexSelect.addEventListener('change',syncBoardIndex);
+      el.boardSearch.addEventListener('input',renderBoardCatalog);
+      el.btnLibraryManager.addEventListener('click',()=>{el.libraryManagerModal.classList.remove('hidden');if(!packageState.librarySynced)syncLibraryIndex();});
+      el.closeLibraryManager.addEventListener('click',()=>el.libraryManagerModal.classList.add('hidden'));
+      el.refreshLibraries.addEventListener('click',syncLibraryIndex);
+      el.librarySearch.addEventListener('input',renderLibraryCatalog);
 
       /* =====================================================================
          16. MAIN 60FPS SIMULATION & RENDER LOOP
@@ -3672,6 +3913,9 @@ void loop() {
 
       function init() {
         refreshSavedDropdown();
+        populateMixerUi();
+        setUsbUi();
+        if (window.AndroidBridge) window.AndroidBridge.scanUsbDevices();
         updateSwitchUI();
         setPreviewView('split');
         resizeArena();
