@@ -1,6 +1,6 @@
 # ESP32 RC Wokwi Lab — Android APK
 
-This repository builds the Android application from the replacement project uploaded on 25 November 2026: `esp32_rc_wokwi_lab_android.zip`.
+This repository builds the Android application from the updated project uploaded on 25 November 2026: `esp32_rc_wokwi_lab_android_v2.zip`.
 
 ## Build the APK
 
@@ -13,6 +13,6 @@ The workflow restores and verifies the supplied ZIP, installs the Capacitor depe
 
 ## Project scope
 
-The supplied Android app contains the virtual ESP32 + Dual BTS7960 + FlySky FS-i6S simulator, multi-touch gimbals, RC channel mixer, presets, editor, and simulated serial monitor.
+This version packages the updated ESP32 + Dual BTS7960 + FlySky FS-i6S simulator from the supplied ZIP.
 
 The source README specifies that real `arduino-cli` ESP32 compiling/flashing and desktop Boards/Library Manager functions belong to the Windows desktop Python app. They should not be considered available as native Android firmware upload features in this APK.
