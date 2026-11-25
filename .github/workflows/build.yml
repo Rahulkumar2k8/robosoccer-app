@@ -29,7 +29,7 @@ jobs:
       - name: Restore uploaded v4 project ZIP
         run: |
           set -euo pipefail
-          cat .github/source/v4/archive.part*.bin > /tmp/esp32_rc_wokwi_lab_android_v4.zip
+          cat .github/source/v4/archive.part0[1-7].bin .github/source/v4/final/archive.final.part*.bin > /tmp/esp32_rc_wokwi_lab_android_v4.zip
           unzip -tq /tmp/esp32_rc_wokwi_lab_android_v4.zip
           mkdir -p .build-source
           unzip -q /tmp/esp32_rc_wokwi_lab_android_v4.zip -d .build-source
