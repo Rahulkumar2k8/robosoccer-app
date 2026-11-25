@@ -1,18 +1,18 @@
-# ESP32 RC Wokwi Lab — Android APK
+# ESP32 RC Wokwi Lab — Android APK (v4)
 
-This repository builds the Android application from the updated project uploaded on 25 November 2026: `esp32_rc_wokwi_lab_android_v2.zip`.
+This repository builds the v4 Android project supplied on 25 November 2026, including the Capacitor app, USB-OTG device filters, and native USB serial bridge for ESP32 serial communication.
 
 ## Build the APK
 
 1. Open the repository's **Actions** tab.
 2. Select **Build ESP32 RC Wokwi Lab (Android APK)**.
-3. Wait for the run to complete successfully.
+3. Wait for the workflow to complete successfully.
 4. Download the `ESP32_RC_Wokwi_Lab-Android-APK` artifact and extract `app-debug.apk`.
 
-The workflow restores and verifies the supplied ZIP, installs the Capacitor dependencies, generates the Android project, builds the debug APK, and uploads it as a workflow artifact.
+The workflow restores and validates the supplied v4 ZIP, installs Capacitor, configures the native Android USB serial bridge and USB-OTG support, builds the debug APK, and uploads the APK as a workflow artifact.
 
-## Project scope
+## v4 project scope
 
-This version packages the updated ESP32 + Dual BTS7960 + FlySky FS-i6S simulator from the supplied ZIP.
+The APK includes the ESP32 Dev Module + Dual BTS7960 + FlySky FS-i6S simulator, multi-touch dual gimbals, RC Channel Mixer (CH2 - CH3 / CH2 + CH3 / ± Diff), Arduino editor, Dual Serial Monitor, and native USB serial bridge support.
 
-The source README specifies that real `arduino-cli` ESP32 compiling/flashing and desktop Boards/Library Manager functions belong to the Windows desktop Python app. They should not be considered available as native Android firmware upload features in this APK.
+Real `arduino-cli` ESP32 compiling/flashing, Boards Manager, and Library Manager require the Windows desktop Python app; these are not native Android toolchain features.

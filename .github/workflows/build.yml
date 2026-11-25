@@ -26,35 +26,64 @@ jobs:
           accept-android-sdk-licenses: true
           log-accepted-android-sdk-licenses: false
 
-      - name: Restore uploaded project ZIP
+      - name: Restore uploaded v4 project ZIP
         run: |
           set -euo pipefail
-          cat .github/source/archive.part*.b64 > /tmp/esp32_rc_wokwi_lab_android.zip
-          unzip -tq /tmp/esp32_rc_wokwi_lab_android.zip
+          cat .github/source/v4/archive.part*.bin > /tmp/esp32_rc_wokwi_lab_android_v4.zip
+          unzip -tq /tmp/esp32_rc_wokwi_lab_android_v4.zip
           mkdir -p .build-source
-          unzip -q /tmp/esp32_rc_wokwi_lab_android.zip -d .build-source
+          unzip -q /tmp/esp32_rc_wokwi_lab_android_v4.zip -d .build-source
           test -s .build-source/esp32_rc_wokwi_lab_android/package.json
           test -s .build-source/esp32_rc_wokwi_lab_android/www/index.html
           test -s .build-source/esp32_rc_wokwi_lab_android/capacitor.config.json
-          echo "Restored supplied ESP32 RC Wokwi Lab Android project."
+          test -s .build-source/esp32_rc_wokwi_lab_android/android_native/MainActivity.java
+          test -s .build-source/esp32_rc_wokwi_lab_android/android_native/UsbSerialBridge.java
+          echo "Restored uploaded v4 Android project."
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install Capacitor and generate Android project
+      - name: Install Capacitor and configure native Android USB serial bridge
         working-directory: .build-source/esp32_rc_wokwi_lab_android
         run: |
+          set -euo pipefail
           npm install
           npx cap add android
           mkdir -p android/app/src/main/res/xml
+          mkdir -p android/app/src/main/java/com/esp32rc/wokwilab
           cp usb_otg/device_filter.xml android/app/src/main/res/xml/device_filter.xml
+          cp android_native/UsbSerialBridge.java android/app/src/main/java/com/esp32rc/wokwilab/UsbSerialBridge.java
+          cp android_native/MainActivity.java android/app/src/main/java/com/esp32rc/wokwilab/MainActivity.java
+
+          python3 - <<'PY'
+          from pathlib import Path
+          bgp = Path("android/build.gradle")
+          bg = bgp.read_text()
+          if "jitpack.io" not in bg:
+              bg = bg.replace("mavenCentral()", 'mavenCentral()\n        maven { url "https://jitpack.io" }')
+              bgp.write_text(bg)
+
+          app = Path("android/app/build.gradle")
+          abg = app.read_text()
+          if "usb-serial-for-android" not in abg:
+              abg = abg.replace("dependencies {", 'dependencies {\n    implementation "com.github.mik3y:usb-serial-for-android:3.8.0"', 1)
+              app.write_text(abg)
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          mf = manifest.read_text()
+          if "android.hardware.usb.host" not in mf:
+              mf = mf.replace("<application", '<uses-feature android:name="android.hardware.usb.host" android:required="false" />\n    <application', 1)
+              manifest.write_text(mf)
+          PY
+
           npx cap sync android
 
       - name: Build Debug APK
         working-directory: .build-source/esp32_rc_wokwi_lab_android/android
         run: |
+          set -euo pipefail
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug
           test -s app/build/outputs/apk/debug/app-debug.apk
